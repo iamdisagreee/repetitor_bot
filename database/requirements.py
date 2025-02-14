@@ -1,7 +1,7 @@
 from datetime import datetime, date, time
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
+from sqlalchemy import select, and_
 
 from database.models.lesson_week import LessonWeek
 from database.models.teacher import Teacher
@@ -37,3 +37,32 @@ async def command_add_lesson_week(session: AsyncSession,
 
     session.add(lessons_week)
     await session.commit()
+
+
+# Получаем все данные о текущем дне (все его окошки для занятий)
+async def give_installed_lessons_week(session: AsyncSession,
+                                      teacher_id: int,
+                                      week_date: date):
+    res_time = await session.execute(
+        select(LessonWeek)
+        .where(
+            and_(
+                LessonWeek.teacher_id == teacher_id,
+                LessonWeek.week_date == week_date
+            )
+        )
+        .order_by(LessonWeek.work_start)
+    )
+
+    return res_time.scalars()
+
+
+async def delete_week_day(session: AsyncSession,
+                          week_id: int):
+    stmt = select(LessonWeek).where(LessonWeek.week_id == week_id)
+
+    res_found = (await session.execute(stmt)).scalar()
+
+    await session.delete(res_found)
+    await session.commit()
+

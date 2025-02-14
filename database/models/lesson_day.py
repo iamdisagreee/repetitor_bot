@@ -18,6 +18,8 @@ class LessonDay(Base):
     #     BigInteger,
     #     ForeignKey('lessons_week.week_id'),
     # )
+    week_id: Mapped[int] = mapped_column(Integer)
+
     week_date: Mapped[date] = mapped_column(
         Date,
         #ForeignKey('lessons_week.week_date'),
@@ -43,10 +45,11 @@ class LessonDay(Base):
         nullable=False
     )
 
-    # status: Mapped[bool] = mapped_column(Boolean)
+    status: Mapped[bool] = mapped_column(Boolean)
 
-    __table_args__ = (ForeignKeyConstraint(['week_date', 'teacher_id'],
-                                           [lesson_week.LessonWeek.week_date,
+    __table_args__ = (ForeignKeyConstraint(['week_id', 'week_date', 'teacher_id'],
+                                           [lesson_week.LessonWeek.week_id,
+                                            lesson_week.LessonWeek.week_date,
                                             lesson_week.LessonWeek.teacher_id],
                                            ondelete='cascade'),
                       {})

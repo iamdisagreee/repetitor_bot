@@ -12,7 +12,7 @@ from . import teacher, lesson_day
 class LessonWeek(Base):
     __tablename__ = 'lessons_week'
 
-    # week_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    week_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
 
     week_date: Mapped[date] = mapped_column(
         Date(),

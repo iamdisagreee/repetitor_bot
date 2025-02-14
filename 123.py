@@ -47,18 +47,37 @@ a = {'1': '2',
      '2': '3'}
 b(**a)
 
+
 def c():
     return {'a': 1, "b": 2}
+
+
 d = c()
 print(d)
+
+
 # tim = datetime.now()
 #
 # day_of_the_month = tim.strftime("%H:%M")
 # print(day_of_the_month, type(day_of_the_month))
-def abc(t: time):
-    print(t)
+# def abc(t: time):
+#     print(t)
+#
+#
+# d = time(hour=12, minute=13)
+# e = time(hour=13, minute=40)
+# delta1 = timedelta(hours=d.hour, minutes=d.minute)
+# delta2 = timedelta(hours=e.hour, minutes=e.minute)
+# print((delta2 - delta1) > timedelta(minutes=30))
 
 
-d = time(hour='12', minute='13')
-abc(d)
+a = {date(2024, 12, 1): date(2024, 12, 2)}
+print(a)
 
+g = time(1, 1, )
+print(g.strftime("%H:%M"))
+
+a = [[1], [2], [3]]
+b = [[1]]
+
+print(a+b)

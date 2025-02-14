@@ -14,10 +14,11 @@ class Student(Base):
     student_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
     name: Mapped[str] = mapped_column(String(50))
     surname: Mapped[str] = mapped_column(String(50))
-    subject: Mapped[str] = mapped_column(String(20))
+    city: Mapped[str] = mapped_column(String(50))
     place_study: Mapped[str] = mapped_column(String(20))
     class_learning: Mapped[int] = mapped_column(Integer)
     course_learning: Mapped[int] = mapped_column(Integer)
+    subject: Mapped[str] = mapped_column(String(20))
     teacher_id: Mapped[int] = mapped_column(BigInteger,
                                             ForeignKey('teachers.teacher_id',
                                                        ondelete='cascade'))

@@ -12,7 +12,7 @@ from datetime import datetime
 from sqlalchemy import BigInteger, func, Integer, ForeignKey, String, DateTime
 from sqlalchemy.orm import mapped_column, Mapped, DeclarativeBase
 from aiogram.fsm.storage.redis import RedisStorage
-from handlers import teacher_handlers
+from handlers import teacher_handlers, everyone_handlers, student_handlers
 from middlewares.outer import DbSessionMiddleware
 
 
@@ -41,6 +41,8 @@ async def main():
     session_maker = async_sessionmaker(engine)
 
     dp.include_router(teacher_handlers.router)
+    dp.include_router(everyone_handlers.router)
+    dp.include_router(student_handlers.router)
 
     dp.update.outer_middleware(DbSessionMiddleware(session_maker))
 
