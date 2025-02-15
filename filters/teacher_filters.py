@@ -6,22 +6,17 @@ from typing import Dict, Any
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import BaseFilter
-from pydantic import json
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
 from database import Teacher, LessonWeek
-from database.requirements import give_installed_lessons_week
+from database.teacher_requirements import give_installed_lessons_week
 from services.services import give_list_with_days, give_date_format_callback, give_date_format_fsm, give_time_format_fsm
 
 
 class IsTeacherInDatabase(BaseFilter):
     async def __call__(self, message: Message, session: AsyncSession):
-        # pprint(data, compact=True)
-        # print(data)
-        # data_json = data.model_dump_json(indent=4)
-        # print(data_json)
-        # session = data_json['session']
+
         stmt = select(Teacher).where(Teacher.teacher_id == message.from_user.id)
         result = await session.execute(stmt)
         # print(result.scalar() is None)
@@ -31,7 +26,7 @@ class IsTeacherInDatabase(BaseFilter):
 class FindNextSevenDaysFromKeyboard(BaseFilter):
     async def __call__(self, callback: CallbackQuery):
         my_days = [
-            cur_date.strftime('%Y-%m-%d') for cur_date in give_list_with_days(datetime.now() + timedelta(days=1))
+            cur_date.strftime('%Y-%m-%d') for cur_date in give_list_with_days(datetime.now())
         ]
         return callback.data in my_days
 

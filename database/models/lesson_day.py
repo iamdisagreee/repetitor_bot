@@ -2,6 +2,7 @@ from datetime import datetime, date, time
 
 from sqlalchemy import BigInteger, Date, func, Integer, ForeignKey, Time, text, Boolean, ForeignKeyConstraint
 from sqlalchemy.orm import mapped_column, Mapped, relationship
+from sqlalchemy.sql import expression
 
 from database.base import Base
 # from database import LessonWeek, Student
@@ -45,7 +46,8 @@ class LessonDay(Base):
         nullable=False
     )
 
-    status: Mapped[bool] = mapped_column(Boolean)
+    status: Mapped[bool] = mapped_column(Boolean,
+                                         server_default=expression.false())
 
     __table_args__ = (ForeignKeyConstraint(['week_id', 'week_date', 'teacher_id'],
                                            [lesson_week.LessonWeek.week_id,

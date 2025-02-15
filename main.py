@@ -31,17 +31,17 @@ async def main():
     # for table_name in Base.metadata.tables.keys():
     #     print(table_name)
 
-    async with engine.begin() as connection:
-        await connection.run_sync(Base.metadata.drop_all)
-        await connection.run_sync(Base.metadata.create_all)
+    # async with engine.begin() as connection:
+    #     await connection.run_sync(Base.metadata.drop_all)
+    #     await connection.run_sync(Base.metadata.create_all)
 
     bot = Bot(token=config.tgbot.token)
     dp = Dispatcher(storage=storage)
 
     session_maker = async_sessionmaker(engine)
 
-    dp.include_router(teacher_handlers.router)
     dp.include_router(everyone_handlers.router)
+    dp.include_router(teacher_handlers.router)
     dp.include_router(student_handlers.router)
 
     dp.update.outer_middleware(DbSessionMiddleware(session_maker))

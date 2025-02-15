@@ -8,12 +8,12 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.fsm.state import StatesGroup, State, default_state
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
-from database.requirements import command_add_teacher, command_add_lesson_week, give_installed_lessons_week, \
+from database.teacher_requirements import command_add_teacher, command_add_lesson_week, give_installed_lessons_week, \
     delete_week_day
-from filters.filters import IsTeacherInDatabase, IsLessonWeekInDatabaseCallback, \
+from filters.teacher_filters import IsTeacherInDatabase, IsLessonWeekInDatabaseCallback, \
     FindNextSevenDaysFromKeyboard, IsCorrectFormatInput, IsNoEndBiggerStart, IsDifferenceThirtyMinutes, \
     IsNoConflictWithStart, IsNoConflictWithEnd, IsRemoveNameRight, IsLessonWeekInDatabaseState
-from keyboards.repetitor_kb import create_entrance_kb, create_back_to_entrance_kb, create_authorization_kb, \
+from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb, create_authorization_kb, \
     show_next_seven_days_kb, create_back_to_profile_kb, create_add_remove_gap_kb, create_all_records_week_day
 from services.services import give_list_with_days, give_time_format_fsm, give_date_format_fsm, \
     give_list_registrations_str
@@ -56,6 +56,7 @@ async def process_entrance(callback: CallbackQuery):
     teacher_entrance_kb = create_entrance_kb()
     await callback.message.edit_text(text='Меню идентификации!',
                                      reply_markup=teacher_entrance_kb)
+
 
 #################################### Логика регистрации учителя #####################################
 @router.callback_query(F.data == 'reg_teacher', ~IsTeacherInDatabase(), StateFilter(default_state))
@@ -128,26 +129,11 @@ async def process_start_authorization(callback: CallbackQuery):
 # Кнопка __расписание__ -> Добавление, Удаление
 @router.callback_query(F.data == 'schedule_teacher')
 async def process_show_schedule(callback: CallbackQuery):
-    next_seven_days = give_list_with_days(datetime.now() + timedelta(days=1))
+    next_seven_days_with_cur = give_list_with_days(datetime.now())
 
     await callback.message.edit_text(text='Давайте поработаем с вашим расписанием\n'
                                           'на 7 дней вперед!\n\n Чтобы заполнить, выбери день!',
-                                     reply_markup=show_next_seven_days_kb(*next_seven_days, back='<<назад'))
-
-
-# @router.callback_query(F.data == 'schedule_teacher')
-# async def process_menu_add_remove(callback: CallbackQuery):
-#     await callback.message.edit_text(text='Выберите что вы хотите сделать с раписанием!',
-#                                      reply_markup=create_add_remove_gap_kb(back='<<назад'))
-
-
-# Кнопка добавить расписание
-# @router.callback_query(F.data == 'add_gap_teacher')
-# async def process_add_gap_teacher(callback: CallbackQuery):
-#     next_seven_days = give_list_with_days(datetime.now() + timedelta(days=1))
-#     await callback.message.edit_text(text='Давайте поработаем с вашим расписанием\n'
-#                                           'на 7 дней вперед!\n\n Чтобы заполнить, выбери день!',
-#                                      reply_markup=show_next_seven_days_kb(*next_seven_days, back='<<назад'))
+                                     reply_markup=show_next_seven_days_kb(*next_seven_days_with_cur, back='<<назад'))
 
 
 # Выбираем кнопку __добавить__ или __удалить__ окошко!!

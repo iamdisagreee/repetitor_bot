@@ -9,12 +9,13 @@ NUMERIC_DATE = {1: 'понедельник',
                 7: 'воскресенье'}
 
 NUMBER_DAYS = 7
+NUMBER_ENTRIES = 9
 
 
 def give_list_with_days(get_date: datetime):
     result_date = []
 
-    for days in range(NUMBER_DAYS):
+    for days in range(NUMBER_DAYS+1):
         next_date = get_date + timedelta(days=days)
         # format_date = next_date.strftime('%d.%m')
         name_date = date(year=next_date.year, month=next_date.month, day=next_date.day)

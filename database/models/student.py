@@ -16,8 +16,10 @@ class Student(Base):
     surname: Mapped[str] = mapped_column(String(50))
     city: Mapped[str] = mapped_column(String(50))
     place_study: Mapped[str] = mapped_column(String(20))
-    class_learning: Mapped[int] = mapped_column(Integer)
-    course_learning: Mapped[int] = mapped_column(Integer)
+    class_learning: Mapped[int] = mapped_column(Integer,
+                                                nullable=True)
+    course_learning: Mapped[int] = mapped_column(Integer,
+                                                 nullable=True)
     subject: Mapped[str] = mapped_column(String(20))
     teacher_id: Mapped[int] = mapped_column(BigInteger,
                                             ForeignKey('teachers.teacher_id',

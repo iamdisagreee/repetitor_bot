@@ -55,7 +55,6 @@ def c():
 d = c()
 print(d)
 
-
 # tim = datetime.now()
 #
 # day_of_the_month = tim.strftime("%H:%M")
@@ -70,14 +69,14 @@ print(d)
 # delta2 = timedelta(hours=e.hour, minutes=e.minute)
 # print((delta2 - delta1) > timedelta(minutes=30))
 
+# def b(**a):
+#     print(command)
+# a= {'command':2}
 
-a = {date(2024, 12, 1): date(2024, 12, 2)}
-print(a)
+a = timedelta(minutes=1)
+b = time(hour=12, minute=12)
+now = datetime.now()
+c = datetime(year=now.year, month=now.month, day=now.day,
+             hour=b.hour, minute=b.minute)
 
-g = time(1, 1, )
-print(g.strftime("%H:%M"))
-
-a = [[1], [2], [3]]
-b = [[1]]
-
-print(a+b)
+print((a+c).minute)

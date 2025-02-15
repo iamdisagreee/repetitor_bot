@@ -8,20 +8,26 @@ from services.services import NUMERIC_DATE
 def create_entrance_kb():
     entrance_kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text='Авторизация',
-                                  callback_data='auth_teacher')],
-            [InlineKeyboardButton(text='Регистрация',
-                                  callback_data='reg_teacher')]
-        ],
+                            [InlineKeyboardButton(text='Авторизация',
+                                                  callback_data='auth_teacher')],
+                            [InlineKeyboardButton(text='Регистрация',
+                                                  callback_data='reg_teacher')]
+                        ] + [
+                            [InlineKeyboardButton(text='<назад',
+                                                  callback_data='start')]
+                        ]
     )
     return entrance_kb
 
 
 def create_back_to_entrance_kb():
     back_to_entrance_kb = InlineKeyboardMarkup(
-        inline_keyboard=[[InlineKeyboardButton(
-            text='Перейти в меню идентификации!',
-            callback_data='teacher_entrance')]]
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text='Перейти в меню идентификации!',
+                callback_data='teacher_entrance')
+            ]
+        ]
     )
 
     return back_to_entrance_kb
@@ -33,7 +39,12 @@ def create_authorization_kb():
             [InlineKeyboardButton(text='Настройка расписания',
                                   callback_data='schedule_teacher')],
             [InlineKeyboardButton(text='Подтверждение оплаты',
-                                  callback_data='confirmation_pay')]])
+                                  callback_data='confirmation_pay')],
+            [InlineKeyboardButton(text='<назад',
+                                  callback_data='teacher_entrance')
+            ]
+        ]
+    )
     return authorization_kb
 
 
@@ -48,9 +59,9 @@ def show_next_seven_days_kb(*days, back):
                   for cur_date in days
               ] + [[InlineKeyboardButton(text=back,
                                          callback_data='auth_teacher')]]
-    next_seven_days_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+    next_seven_days_with_cur_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
 
-    return next_seven_days_kb
+    return next_seven_days_with_cur_kb
 
 
 def create_add_remove_gap_kb(back: str):
