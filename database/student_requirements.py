@@ -45,13 +45,38 @@ async def command_add_students(session: AsyncSession,
 
 
 async def give_lessons_week_for_day(session: AsyncSession,
-                                    week_date: date):
-    stmt = (select(LessonWeek)
-            .where(LessonWeek.week_date == week_date))
+                                    week_date: date,
+                                    teacher_id: int):
+    stmt = (
+        select(LessonWeek)
+        .where(
+            and_(LessonWeek.week_date == week_date,
+                 LessonWeek.teacher_id == teacher_id)
+        )
+    )
 
     lessons_week_for_day = await session.execute(stmt)
 
     return lessons_week_for_day.scalars()
+
+
+# Получаем список существующих записей на заданный день
+async def give_all_busy_time_intervals(session: AsyncSession,
+                                       teacher_id: int,
+                                       week_date: int):
+    result = await session.execute(
+        select(LessonDay)
+        .where(
+            and_(
+                LessonDay.week_date == week_date,
+                LessonDay.teacher_id == teacher_id
+
+            )
+        )
+        .order_by(LessonDay.lesson_start)
+    )
+
+    return result.scalars()
 
 
 async def add_lesson_day(session: AsyncSession,
@@ -60,15 +85,77 @@ async def add_lesson_day(session: AsyncSession,
                          teacher_id: int,
                          student_id: int,
                          lesson_start: time,
-                         lesson_end: time):
+                         lesson_finished: time):
     lesson_day = LessonDay(
-        wee_date=week_date,
+        week_date=week_date,
         week_id=week_id,
         teacher_id=teacher_id,
         student_id=student_id,
         lesson_start=lesson_start,
-        lesson_end=lesson_end,
+        lesson_finished=lesson_finished,
     )
 
     session.add(lesson_day)
+    await session.commit()
+
+
+async def give_teacher_id_by_student_id(session: AsyncSession,
+                                        student_id: int):
+    teacher_id = await session.execute(select(Student.teacher_id)
+                                       .where(Student.student_id == student_id))
+
+    return teacher_id.scalar()
+
+
+async def give_week_id_by_teacher_id(session: AsyncSession,
+                                     teacher_id: int,
+                                     week_date: time,
+                                     lesson_start: time,
+                                     lesson_finished: time):
+    week_id = await session.execute(
+        select(LessonWeek.week_id)
+        .where(
+            and_(LessonWeek.teacher_id == teacher_id,
+                 LessonWeek.week_date == week_date,
+                 LessonWeek.work_start <= lesson_start,
+                 LessonWeek.work_end >= lesson_finished)
+        )
+    )
+
+    return week_id.scalar()
+
+
+async def give_all_lessons_for_day(session: AsyncSession,
+                                   week_date: date,
+                                   student_id: int):
+    all_lessons_for_day = await session.execute(
+        select(LessonDay)
+        .where(
+            and_(
+                LessonDay.student_id == student_id,
+                LessonDay.week_date == week_date
+            )
+        ).order_by(LessonDay.lesson_start)
+    )
+
+    return all_lessons_for_day.scalars()
+
+
+async def remove_lesson_day(session: AsyncSession,
+                            student_id: int,
+                            week_date: time,
+                            lesson_start: time,
+                            lesson_finished: time):
+    delete_lesson = (await session.execute(
+        select(LessonDay)
+        .where(
+            and_(LessonDay.lesson_start == lesson_start,
+                 LessonDay.lesson_finished == lesson_finished,
+                 LessonDay.student_id == student_id,
+                 LessonDay.week_date == week_date)
+        )
+    )
+                     ).scalar()
+
+    await session.delete(delete_lesson)
     await session.commit()

@@ -11,16 +11,17 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
-from callback_factory.student import ExistFieldCallbackFactory
+from callback_factory.student import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, DeleteFieldCallbackFactory
 from database.student_requirements import command_get_all_teachers, command_add_students, give_lessons_week_for_day, \
-    add_lesson_day
+    add_lesson_day, give_teacher_id_by_student_id, give_all_busy_time_intervals, \
+    give_all_lessons_for_day, remove_lesson_day, give_week_id_by_teacher_id
 from filters.student_filters import IsStudentInDatabase, IsInputFieldAlpha, IsInputFieldDigit, \
-    FindNextSevenDaysFromKeyboard, IsMoveRightAddMenu, IsMoveLeftAddMenu
+    FindNextSevenDaysFromKeyboard, IsMoveRightAddMenu, IsMoveLeftAddMenu, IsTeacherDidSlots, IsStudentChooseSlots
 from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, create_level_choice_kb, \
     create_back_to_entrance_kb, create_authorization_kb, show_next_seven_days_kb, create_menu_add_remove_kb, \
-    create_choose_time_student_kb
+    create_choose_time_student_kb, create_delete_lessons_menu
 from services.services import give_list_with_days, create_choose_time_student, give_date_format_fsm, \
-    give_time_format_fsm
+    give_time_format_fsm, create_delete_time_student
 
 router = Router()
 
@@ -239,30 +240,38 @@ async def process_settings_schedule(callback: CallbackQuery, state: FSMContext):
     await state.clear()
 
 
-# Здесы выбираем добавить/удалить окошко
+############################ Здесь выбираем добавить/удалить окошко ###################################3
 @router.callback_query(FindNextSevenDaysFromKeyboard(), StateFilter(default_state))
 async def process_menu_add_remove(callback: CallbackQuery, state: FSMContext):
     await state.update_data(page=1,
                             week_date=callback.data)
 
-    await callback.message.edit_text(text='Выберите что вы хотите сделать с уроками',
+    await callback.message.edit_text(text='Выберите что вы хотите сделать с уроками'
+                                     ,
                                      reply_markup=create_menu_add_remove_kb())
 
 
+###################################### Кнопка добавить ########################################3
 # Нажимаем добавить, открываем меню со свободными слотами
-@router.callback_query(F.data == 'add_gap_student')
+@router.callback_query(F.data == 'add_gap_student', IsTeacherDidSlots())
 async def process_add_time_study(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
     state_dict = await state.get_data()
     week_date_str = state_dict['week_date']
     week_date = give_date_format_fsm(week_date_str)
     page = state_dict['page']
 
-    lessons_week = await give_lessons_week_for_day(session, week_date)
+    teacher_id = await give_teacher_id_by_student_id(session,
+                                                     callback.from_user.id)
+    lessons_busy = await give_all_busy_time_intervals(session,
+                                                      teacher_id,
+                                                      week_date)
 
-    dict_lessons = create_choose_time_student(lessons_week)
+    lessons_week = await give_lessons_week_for_day(session, week_date, teacher_id)
+    dict_lessons = create_choose_time_student(lessons_week, lessons_busy)
 
     await callback.message.edit_text(text='Выбери слот старта занятия!\n'
-                                          'Все слоты по 30 минут!',
+                                          'Все слоты по 30 минут!\n'
+                                          'Если свободных слотов НЕТ - это значит, что все разобрано!!!!',
                                      reply_markup=create_choose_time_student_kb(
                                          dict_lessons,
                                          week_date_str,
@@ -279,10 +288,18 @@ async def process_move_right_add_menu(callback: CallbackQuery, session: AsyncSes
     page = state_dict['page'] + 1
     await state.update_data(page=page)
 
-    lessons_week = await give_lessons_week_for_day(session, week_date)
-    dict_lessons = create_choose_time_student(lessons_week)
+    teacher_id = await give_teacher_id_by_student_id(session,
+                                                     callback.from_user.id)
+    lessons_busy = await give_all_busy_time_intervals(session,
+                                                      teacher_id,
+                                                      week_date)
+
+    lessons_week = await give_lessons_week_for_day(session, week_date, teacher_id)
+    dict_lessons = create_choose_time_student(lessons_week, lessons_busy)
+
     await callback.message.edit_text(text='Выбери слот старта занятия!\n'
-                                          'Все слоты по 30 минут!',
+                                          'Все слоты по 30 минут!\n'
+                                     ,
                                      reply_markup=create_choose_time_student_kb(
                                          dict_lessons,
                                          week_date_str,
@@ -299,8 +316,15 @@ async def process_move_right_add_menu(callback: CallbackQuery, session: AsyncSes
     page = state_dict['page'] - 1
     await state.update_data(page=page)
 
-    lessons_week = await give_lessons_week_for_day(session, week_date)
-    dict_lessons = create_choose_time_student(lessons_week)
+    teacher_id = await give_teacher_id_by_student_id(session,
+                                                     callback.from_user.id)
+    lessons_busy = await give_all_busy_time_intervals(session,
+                                                      teacher_id,
+                                                      week_date)
+
+    lessons_week = await give_lessons_week_for_day(session, week_date, teacher_id)
+    dict_lessons = create_choose_time_student(lessons_week, lessons_busy)
+
     await callback.message.edit_text(text='Выбери слот старта занятия!\n'
                                           'Все слоты по 30 минут!',
                                      reply_markup=create_choose_time_student_kb(
@@ -323,22 +347,106 @@ async def process_not_move_right_add_menu(callback: CallbackQuery):
 
 
 # Нажимаем на занятие и оно появляется в нашей базе данных!
-# @router.callback_query(ExistFieldCallbackFactory.filter())
-# async def process_touch_menu_add(callback: CallbackQuery, session: AsyncSession, state: FSMContext,
-#                                  callback_data: ExistFieldCallbackFactory):
-#     state_dict = await state.get_data()
-#     week_date_str = state_dict['week_date']
-#     week_date = give_date_format_fsm(week_date_str)
-#
-#     lesson_start = give_time_format_fsm(callback_data.lesson_start)
-#     lesson_end = give_time_format_fsm(callback_data.lesson_end)
-    #print(callback_data.lesson_start, callback_data.lesson_end)
+@router.callback_query(ExistFieldCallbackFactory.filter())
+async def process_touch_menu_add(callback: CallbackQuery, session: AsyncSession, state: FSMContext,
+                                 callback_data: ExistFieldCallbackFactory):
+    state_dict = await state.get_data()
+    week_date_str = state_dict['week_date']
+    week_date = give_date_format_fsm(week_date_str)
 
-    # add_lesson_day(session=session,
-    #                week_date=week_date,
-    #                week_id=123,
-    #                teacher_id=123,
-    #                student_id=callback.from_user.id,
-    #                lesson_start=123,
-    #                lesson_end=123,
-    #                )
+    teacher_id = await give_teacher_id_by_student_id(session,
+                                                     callback.from_user.id)
+    lesson_start = give_time_format_fsm(callback_data.lesson_start)
+    lesson_finished = give_time_format_fsm(callback_data.lesson_finished)
+
+    week_id = await give_week_id_by_teacher_id(session,
+                                                  teacher_id,
+                                                  week_date,
+                                                  lesson_start,
+                                                  lesson_finished)
+    await add_lesson_day(session=session,
+                         week_date=week_date,
+                         week_id=week_id,
+                         teacher_id=teacher_id,
+                         student_id=callback.from_user.id,
+                         lesson_start=lesson_start,
+                         lesson_finished=lesson_finished,
+                         )
+
+    teacher_id = await give_teacher_id_by_student_id(session,
+                                                     callback.from_user.id)
+    lessons_busy = await give_all_busy_time_intervals(session,
+                                                      teacher_id,
+                                                      week_date)
+
+    lessons_week = await give_lessons_week_for_day(session, week_date, teacher_id)
+    dict_lessons = create_choose_time_student(lessons_week, lessons_busy)
+    page = state_dict['page']
+    await callback.message.edit_text(text='Выбери слот старта занятия!\n'
+                                          'Все слоты по 30 минут!',
+                                     reply_markup=create_choose_time_student_kb(
+                                         dict_lessons,
+                                         week_date_str,
+                                         page
+                                     ))
+
+
+# Нажимаем на пустую кнопку
+@router.callback_query(EmptyAddFieldCallbackFactory.filter())
+async def process_touch_empty_button(callback: CallbackQuery):
+    await callback.answer()
+
+
+# Случай, когда учитель еще не выставил слоты!
+@router.callback_query(F.data == 'add_gap_student', ~IsTeacherDidSlots())
+async def process_teacher_did_not_slots(callback: CallbackQuery):
+    await callback.answer("Репетитор еще не выставил слоты!")
+
+
+###################################### Кнопка удалить ###########################################
+
+@router.callback_query(F.data == 'remove_gap_student', IsStudentChooseSlots())
+async def process_remove_time_study(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
+    state_dict = await state.get_data()
+    week_date_str = state_dict['week_date']
+    week_date = give_date_format_fsm(week_date_str)
+    page = state_dict['page']
+
+    all_busy_lessons = await give_all_lessons_for_day(session,
+                                                      week_date,
+                                                      callback.from_user.id)
+    dict_for_6_lessons = create_delete_time_student(all_busy_lessons)
+    await callback.message.edit_text(text='Нажмите, чтобы удалить запись!',
+                                     reply_markup=create_delete_lessons_menu(dict_for_6_lessons,
+                                                                             week_date_str,
+                                                                             page))
+
+
+# Настраиваем удаление записей по нажатию на кнопку!
+@router.callback_query(DeleteFieldCallbackFactory.filter())
+async def process_touch_menu_remove(callback: CallbackQuery, session: AsyncSession, state: FSMContext,
+                                    callback_data: DeleteFieldCallbackFactory):
+    state_dict = await state.get_data()
+    week_date_str = state_dict['week_date']
+    week_date = give_date_format_fsm(week_date_str)
+    page = state_dict['page']
+
+    lesson_start = give_time_format_fsm(callback_data.lesson_start)
+    lesson_finished = give_time_format_fsm(callback_data.lesson_finished)
+
+    await remove_lesson_day(session,
+                            callback.from_user.id,
+                            week_date,
+                            lesson_start,
+                            lesson_finished
+                            )
+
+    all_busy_lessons = await give_all_lessons_for_day(session,
+                                                      week_date,
+                                                      callback.from_user.id)
+    dict_for_6_lessons = create_delete_time_student(all_busy_lessons)
+    await callback.message.edit_text(text='Нажмите, чтобы удалить запись!',
+                                     reply_markup=create_delete_lessons_menu(dict_for_6_lessons,
+                                                                             week_date_str,
+                                                                             page)
+                                     )

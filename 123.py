@@ -74,10 +74,16 @@ print(d)
 # a= {'command':2}
 
 
-def c(a):
-    print(a)
-a = {1: '1', 2: '2', 3: '3'}
-c(a)
+# def c(a):
+#     print(a)
+# a = {1: '1', 2: '2', 3: '3'}
+# c(a)
+#
+# print(1%9)
+# print({day: [] for day in range(1, 7)})
 
-print(1%9)
-print({day: [] for day in range(1, 7)})
+a = [[1,2], [1, 3]]
+
+if [1, 4] in a:
+    print(123123)
+else: print(0000)

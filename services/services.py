@@ -52,9 +52,9 @@ def give_list_registrations_str(res_time):
 
 
 # Создаем словарь словарей в котором хранятся все ячейки для выбора студентом дат
-def create_choose_time_student(lessons_week):
+def create_choose_time_student(lessons_week, lessons_busy):
+    list_busy = [[lesson.lesson_start, lesson.lesson_finished] for lesson in lessons_busy]
     slots = {day: [] for day in range(1, 9)}
-    one_message = []
     page_slots = 1
     record = 0
 
@@ -80,8 +80,26 @@ def create_choose_time_student(lessons_week):
             start_time += delta_30
             cur_dict['lesson_end'] = time(hour=start_time.hour, minute=start_time.minute)
 
+            if [cur_dict['lesson_start'], cur_dict['lesson_end']] in list_busy:
+                continue
+
             slots[page_slots].append(cur_dict)
             record += 1
 
+    return slots
+
+
+# Создаем словарь словарей в котором хранятся удаляемое время
+def create_delete_time_student(lessons_busy):
+    slots = {day: [] for day in range(1, 9)}
+    page_slots = 1
+    record = 0
+
+    for lesson in lessons_busy:
+        if record == 6:
+            record = 0
+            page_slots += 1
+        slots[page_slots].append(lesson)
+        record += 1
     pprint(slots, indent=4)
     return slots

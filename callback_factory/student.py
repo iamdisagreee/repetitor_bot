@@ -6,9 +6,18 @@ from aiogram.filters.callback_data import CallbackData
 
 class ExistFieldCallbackFactory(CallbackData, prefix="time", sep='-'):
     lesson_start: str
-    lesson_end: str
+    lesson_finished: str
 
 
 # Фабрика колбеков (несуществующие кнопки)
-class NotExistFieldCallbackFactory(CallbackData, prefix='plug'):
+class EmptyAddFieldCallbackFactory(CallbackData, prefix='plug'):
+    plug: str
+
+
+class DeleteFieldCallbackFactory(CallbackData, prefix='delete', sep='-'):
+    lesson_start: str
+    lesson_finished: str
+
+
+class EmptyRemoveFieldCallbackFactory(CallbackData, prefix='plug'):
     plug: str

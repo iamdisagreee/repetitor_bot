@@ -4,7 +4,8 @@ from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from callback_factory.student import ExistFieldCallbackFactory, NotExistFieldCallbackFactory
+from callback_factory.student import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
+    DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory
 from services.services import NUMERIC_DATE
 
 
@@ -108,9 +109,7 @@ def create_choose_time_student_kb(dict_lessons,
                                   week_date_str,
                                   page):
     builder = InlineKeyboardBuilder()
-    print(dict_lessons)
-    # select_dict_lessons = {key: value for key, value in dict_lessons.items() if 9 * page <= key < 9 * page + 9}
-    # print(select_dict_lessons)
+
     counter_buttons = 0
     for lesson in dict_lessons[page]:
         if lesson:
@@ -118,7 +117,7 @@ def create_choose_time_student_kb(dict_lessons,
                 text=f'{lesson['lesson_start'].strftime("%H:%M")}-{lesson['lesson_end'].strftime("%H:%M")}',
                 callback_data=ExistFieldCallbackFactory(
                     lesson_start=lesson['lesson_start'].strftime("%H:%M"),
-                    lesson_end=lesson['lesson_end'].strftime("%H:%M")
+                    lesson_finished=lesson['lesson_end'].strftime("%H:%M")
                 )
             )
             counter_buttons += 1
@@ -126,7 +125,7 @@ def create_choose_time_student_kb(dict_lessons,
     while counter_buttons < 6:
         builder.button(
             text='     ',
-            callback_data=NotExistFieldCallbackFactory(
+            callback_data=EmptyAddFieldCallbackFactory(
                 plug=''
             )
         )
@@ -141,4 +140,38 @@ def create_choose_time_student_kb(dict_lessons,
 
     builder.adjust(2, 2, 2, 2, 1)
 
+    return builder.as_markup()
+
+
+def create_delete_lessons_menu(dict_for_6_lessons,
+                               week_date_str,
+                               page):
+    builder = InlineKeyboardBuilder()
+    counter_buttons = 0
+    for lesson in dict_for_6_lessons[page]:
+        builder.button(
+            text=f'{lesson.lesson_start.strftime("%H:%M")} - {lesson.lesson_finished.strftime("%H:%M")}',
+            callback_data=DeleteFieldCallbackFactory(
+                lesson_start=lesson.lesson_start.strftime("%H:%M"),
+                lesson_finished=lesson.lesson_finished.strftime("%H:%M")
+            )
+        )
+        counter_buttons += 1
+    while counter_buttons < 6:
+        builder.button(
+            text='     ',
+            callback_data=EmptyRemoveFieldCallbackFactory(
+                plug=''
+            )
+        )
+        counter_buttons += 1
+
+    builder.button(text='<<',
+                   callback_data='move_left_remove')
+    builder.button(text='>>',
+                   callback_data='move_right_right')
+    builder.button(text='выйти',
+                   callback_data=week_date_str)
+
+    builder.adjust(2, 2, 2, 2, 1)
     return builder.as_markup()
