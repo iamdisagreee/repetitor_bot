@@ -3,6 +3,7 @@ from pprint import pprint
 
 from aiogram import Router, F, Bot
 from aiogram.filters import CommandStart, StateFilter, Command
+from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm import state
 from aiogram.fsm.context import FSMContext
 from aiogram.fsm.state import StatesGroup, State, default_state
@@ -10,12 +11,16 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
-from database.student_requirements import command_get_all_teachers, command_add_students, give_lessons_week_for_day
+from callback_factory.student import ExistFieldCallbackFactory
+from database.student_requirements import command_get_all_teachers, command_add_students, give_lessons_week_for_day, \
+    add_lesson_day
 from filters.student_filters import IsStudentInDatabase, IsInputFieldAlpha, IsInputFieldDigit, \
-    FindNextSevenDaysFromKeyboard
+    FindNextSevenDaysFromKeyboard, IsMoveRightAddMenu, IsMoveLeftAddMenu
 from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, create_level_choice_kb, \
-    create_back_to_entrance_kb, create_authorization_kb, show_next_seven_days_kb, create_menu_add_remove_kb
-from services.services import give_list_with_days
+    create_back_to_entrance_kb, create_authorization_kb, show_next_seven_days_kb, create_menu_add_remove_kb, \
+    create_choose_time_student_kb
+from services.services import give_list_with_days, create_choose_time_student, give_date_format_fsm, \
+    give_time_format_fsm
 
 router = Router()
 
@@ -244,9 +249,96 @@ async def process_menu_add_remove(callback: CallbackQuery, state: FSMContext):
                                      reply_markup=create_menu_add_remove_kb())
 
 
+# Нажимаем добавить, открываем меню со свободными слотами
 @router.callback_query(F.data == 'add_gap_student')
 async def process_add_time_study(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
-    week_date = (await state.get_data())['week_date']
+    state_dict = await state.get_data()
+    week_date_str = state_dict['week_date']
+    week_date = give_date_format_fsm(week_date_str)
+    page = state_dict['page']
 
-    lessons_week = give_lessons_week_for_day(session, week_date)
+    lessons_week = await give_lessons_week_for_day(session, week_date)
 
+    dict_lessons = create_choose_time_student(lessons_week)
+
+    await callback.message.edit_text(text='Выбери слот старта занятия!\n'
+                                          'Все слоты по 30 минут!',
+                                     reply_markup=create_choose_time_student_kb(
+                                         dict_lessons,
+                                         week_date_str,
+                                         page
+                                     ))
+
+
+# Движемся вправо в нашем меню занятий
+@router.callback_query(F.data == 'move_right_add', IsMoveRightAddMenu())
+async def process_move_right_add_menu(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
+    state_dict = await state.get_data()
+    week_date_str = state_dict['week_date']
+    week_date = give_date_format_fsm(week_date_str)
+    page = state_dict['page'] + 1
+    await state.update_data(page=page)
+
+    lessons_week = await give_lessons_week_for_day(session, week_date)
+    dict_lessons = create_choose_time_student(lessons_week)
+    await callback.message.edit_text(text='Выбери слот старта занятия!\n'
+                                          'Все слоты по 30 минут!',
+                                     reply_markup=create_choose_time_student_kb(
+                                         dict_lessons,
+                                         week_date_str,
+                                         page
+                                     ))
+
+
+# Движемся влево в нашем меню занятий
+@router.callback_query(F.data == 'move_left_add', IsMoveLeftAddMenu())
+async def process_move_right_add_menu(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
+    state_dict = await state.get_data()
+    week_date_str = state_dict['week_date']
+    week_date = give_date_format_fsm(week_date_str)
+    page = state_dict['page'] - 1
+    await state.update_data(page=page)
+
+    lessons_week = await give_lessons_week_for_day(session, week_date)
+    dict_lessons = create_choose_time_student(lessons_week)
+    await callback.message.edit_text(text='Выбери слот старта занятия!\n'
+                                          'Все слоты по 30 минут!',
+                                     reply_markup=create_choose_time_student_kb(
+                                         dict_lessons,
+                                         week_date_str,
+                                         page
+                                     ))
+
+
+# Случай, когда вправо больше нельзя двигаться
+@router.callback_query(F.data == 'move_right_add', ~IsMoveRightAddMenu())
+async def process_not_move_right_add_menu(callback: CallbackQuery):
+    await callback.answer('Двигаться некуда!')
+
+
+# Случай, когда влево нельзя двигаться
+@router.callback_query(F.data == 'move_left_add', ~IsMoveLeftAddMenu())
+async def process_not_move_right_add_menu(callback: CallbackQuery):
+    await callback.answer('Двигаться некуда!')
+
+
+# Нажимаем на занятие и оно появляется в нашей базе данных!
+# @router.callback_query(ExistFieldCallbackFactory.filter())
+# async def process_touch_menu_add(callback: CallbackQuery, session: AsyncSession, state: FSMContext,
+#                                  callback_data: ExistFieldCallbackFactory):
+#     state_dict = await state.get_data()
+#     week_date_str = state_dict['week_date']
+#     week_date = give_date_format_fsm(week_date_str)
+#
+#     lesson_start = give_time_format_fsm(callback_data.lesson_start)
+#     lesson_end = give_time_format_fsm(callback_data.lesson_end)
+    #print(callback_data.lesson_start, callback_data.lesson_end)
+
+    # add_lesson_day(session=session,
+    #                week_date=week_date,
+    #                week_id=123,
+    #                teacher_id=123,
+    #                student_id=callback.from_user.id,
+    #                lesson_start=123,
+    #                lesson_end=123,
+    #                )

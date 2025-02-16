@@ -73,10 +73,11 @@ print(d)
 #     print(command)
 # a= {'command':2}
 
-a = timedelta(minutes=1)
-b = time(hour=12, minute=12)
-now = datetime.now()
-c = datetime(year=now.year, month=now.month, day=now.day,
-             hour=b.hour, minute=b.minute)
 
-print((a+c).minute)
+def c(a):
+    print(a)
+a = {1: '1', 2: '2', 3: '3'}
+c(a)
+
+print(1%9)
+print({day: [] for day in range(1, 7)})

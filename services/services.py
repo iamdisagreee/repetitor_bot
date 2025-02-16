@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta, date, time
+from pprint import pprint
 
 NUMERIC_DATE = {1: 'понедельник',
                 2: 'вторник',
@@ -15,7 +16,7 @@ NUMBER_ENTRIES = 9
 def give_list_with_days(get_date: datetime):
     result_date = []
 
-    for days in range(NUMBER_DAYS+1):
+    for days in range(NUMBER_DAYS + 1):
         next_date = get_date + timedelta(days=days)
         # format_date = next_date.strftime('%d.%m')
         name_date = date(year=next_date.year, month=next_date.month, day=next_date.day)
@@ -48,3 +49,39 @@ def give_list_registrations_str(res_time):
         result_line.append(f'{work_start_str} - {work_end_str}')
 
     return '\n'.join(result_line)
+
+
+# Создаем словарь словарей в котором хранятся все ячейки для выбора студентом дат
+def create_choose_time_student(lessons_week):
+    slots = {day: [] for day in range(1, 9)}
+    one_message = []
+    page_slots = 1
+    record = 0
+
+    for lesson_week in lessons_week:
+
+        now = datetime.now()
+
+        start_time = datetime(year=now.year, month=now.month, day=now.day,
+                              hour=lesson_week.work_start.hour, minute=lesson_week.work_start.minute)
+        end_time = datetime(year=now.year, month=now.month, day=now.day,
+                            hour=lesson_week.work_end.hour, minute=lesson_week.work_end.minute)
+        delta_30 = timedelta(minutes=30)
+
+        while start_time + delta_30 <= end_time:
+
+            cur_dict = {}
+
+            if record == 6:
+                record = 0
+                page_slots += 1
+
+            cur_dict['lesson_start'] = time(hour=start_time.hour, minute=start_time.minute)
+            start_time += delta_30
+            cur_dict['lesson_end'] = time(hour=start_time.hour, minute=start_time.minute)
+
+            slots[page_slots].append(cur_dict)
+            record += 1
+
+    pprint(slots, indent=4)
+    return slots

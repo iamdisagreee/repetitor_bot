@@ -1,8 +1,10 @@
-from datetime import date
+from datetime import date, timedelta, datetime, time
 
 from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
 
+from callback_factory.student import ExistFieldCallbackFactory, NotExistFieldCallbackFactory
 from services.services import NUMERIC_DATE
 
 
@@ -102,18 +104,41 @@ def create_menu_add_remove_kb():
     return add_remove_gap_kb
 
 
-def create_choose_time_student_kb(lessons_week,
+def create_choose_time_student_kb(dict_lessons,
+                                  week_date_str,
                                   page):
-    slots = {}
-    one_message = []
-    page_slots = 1
+    builder = InlineKeyboardBuilder()
+    print(dict_lessons)
+    # select_dict_lessons = {key: value for key, value in dict_lessons.items() if 9 * page <= key < 9 * page + 9}
+    # print(select_dict_lessons)
+    counter_buttons = 0
+    for lesson in dict_lessons[page]:
+        if lesson:
+            builder.button(
+                text=f'{lesson['lesson_start'].strftime("%H:%M")}-{lesson['lesson_end'].strftime("%H:%M")}',
+                callback_data=ExistFieldCallbackFactory(
+                    lesson_start=lesson['lesson_start'].strftime("%H:%M"),
+                    lesson_end=lesson['lesson_end'].strftime("%H:%M")
+                )
+            )
+            counter_buttons += 1
 
-    for record, lesson_week in enumerate(lessons_week):
-        if record % 9 == 0:
-            slots[page_slots] = one_message
-            one_message.clear()
-            page_slots += 1
-        one_message.append({'work_start': lesson_week.work_start,
-                            'work_end': lesson_week.work_end,
-                            'week_id': lesson_week.week_id})
-        record += 1
+    while counter_buttons < 6:
+        builder.button(
+            text='     ',
+            callback_data=NotExistFieldCallbackFactory(
+                plug=''
+            )
+        )
+        counter_buttons += 1
+
+    builder.button(text='<<',
+                   callback_data='move_left_add')
+    builder.button(text='>>',
+                   callback_data='move_right_add')
+    builder.button(text='выйти',
+                   callback_data=week_date_str)
+
+    builder.adjust(2, 2, 2, 2, 1)
+
+    return builder.as_markup()

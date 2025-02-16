@@ -19,6 +19,7 @@ class LessonDay(Base):
     #     BigInteger,
     #     ForeignKey('lessons_week.week_id'),
     # )
+
     week_id: Mapped[int] = mapped_column(Integer)
 
     week_date: Mapped[date] = mapped_column(
