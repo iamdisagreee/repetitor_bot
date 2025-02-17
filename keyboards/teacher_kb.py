@@ -2,6 +2,7 @@ from datetime import date
 
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 
+from callback_factory.teacher import ShowDaysOfPayCallbackFactory
 from services.services import NUMERIC_DATE
 
 
@@ -42,7 +43,7 @@ def create_authorization_kb():
                                   callback_data='confirmation_pay')],
             [InlineKeyboardButton(text='<назад',
                                   callback_data='teacher_entrance')
-            ]
+             ]
         ]
     )
     return authorization_kb
@@ -105,3 +106,22 @@ def create_all_records_week_day(weeks_day):
     all_records_week_day_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
 
     return all_records_week_day_kb
+
+
+def show_next_seven_days_pay_kb(*days):
+    buttons = [
+                  [InlineKeyboardButton(text=f'{cur_date.strftime("%d.%m")} - '
+                                             f'{NUMERIC_DATE[date(year=cur_date.year,
+                                                                  month=cur_date.month,
+                                                                  day=cur_date.day).isoweekday()]}',
+                                        callback_data=ShowDaysOfPayCallbackFactory(
+                                            week_date=cur_date.strftime("%Y-%m-%d")
+                                        ).pack()
+                                        )
+                   ]
+                  for cur_date in days
+              ] + [[InlineKeyboardButton(text='<назад',
+                                         callback_data='auth_teacher')]]
+
+    next_seven_days_with_cur_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+    return next_seven_days_with_cur_kb

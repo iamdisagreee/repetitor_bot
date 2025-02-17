@@ -8,13 +8,15 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.fsm.state import StatesGroup, State, default_state
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
+from callback_factory.teacher import ShowDaysOfPayCallbackFactory
 from database.teacher_requirements import command_add_teacher, command_add_lesson_week, give_installed_lessons_week, \
-    delete_week_day
+    delete_week_day, give_all_lessons_day_by_week_day
 from filters.teacher_filters import IsTeacherInDatabase, IsLessonWeekInDatabaseCallback, \
     FindNextSevenDaysFromKeyboard, IsCorrectFormatInput, IsNoEndBiggerStart, IsDifferenceThirtyMinutes, \
     IsNoConflictWithStart, IsNoConflictWithEnd, IsRemoveNameRight, IsLessonWeekInDatabaseState
 from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb, create_authorization_kb, \
-    show_next_seven_days_kb, create_back_to_profile_kb, create_add_remove_gap_kb, create_all_records_week_day
+    show_next_seven_days_kb, create_back_to_profile_kb, create_add_remove_gap_kb, create_all_records_week_day, \
+    show_next_seven_days_pay_kb
 from services.services import give_list_with_days, give_time_format_fsm, give_date_format_fsm, \
     give_list_registrations_str
 
@@ -36,19 +38,6 @@ async def process_restart_state(message: Message, state: FSMContext):
     await state.clear()
     await message.answer("Состояние очищено!")
 
-
-# @router.message((Command(commands='teacher_entrance') &
-#                 StateFilter(default_state)) |
-# #                 StateFilter(FSMAuthorizationTeacherForm.fill_ready))
-# @router.message(lambda x: (x.text == 'teacher_entrance' and StateFilter(default_state)) or
-#                           StateFilter(FSMAuthorizationTeacherForm.fill_ready)
-#                 )
-
-# @router.message(Command(commands='teacher_entrance'), StateFilter(default_state))
-# async def process_entrance(message: Message):
-#     teacher_entrance_kb = create_entrance_kb()
-#     await message.answer(text='Вы попали в меню идентификации!',
-#                          reply_markup=teacher_entrance_kb)
 
 ############################### Логика входа в меню идентификации #######################################
 @router.callback_query(F.data == 'teacher_entrance', StateFilter(default_state))
@@ -285,7 +274,28 @@ async def process_delete_week_day(callback: CallbackQuery, session: AsyncSession
                                      reply_markup=create_all_records_week_day(weeks_days))
 
 
-# Случай, когда время еще не установлено в дне!
+# Случай, когда нечего удалять из созданных промежутков!
 @router.callback_query(F.data == 'remove_gap_teacher', ~IsLessonWeekInDatabaseState())
 async def process_create_day_schedule_nothing(callback: CallbackQuery):
     await callback.answer(text='Еще не установлено расписание!')
+
+
+########################### Кнопка __Подтверждение оплаты__ ########################
+# Предоставляем выбор дат для просмотра оплаты
+@router.callback_query(F.data == 'confirmation_pay')
+async def process_confirmation_pay(callback: CallbackQuery):
+    next_seven_days_with_cur = give_list_with_days(datetime.now())
+    await callback.message.edit_text(text='Выбери день для просмотра состояния оплаты:',
+                                     reply_markup=show_next_seven_days_pay_kb(*next_seven_days_with_cur))
+
+
+# Вываливаем список учеников в выбранный день, ❌ - не оплачено; ✅ - оплачено
+# Чтобы поменять статус - надо нажать на время!
+@router.callback_query(ShowDaysOfPayCallbackFactory.filter())
+async def process_show_status_student(callback: CallbackQuery, session: AsyncSession,
+                                      callback_data: ShowDaysOfPayCallbackFactory):
+    week_date = give_date_format_fsm(callback_data.week_date)
+
+    await give_all_lessons_day_by_week_day(session,
+                                           callback.from_user.id,
+                                           week_date)

@@ -5,7 +5,8 @@ from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMar
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from callback_factory.student import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
-    DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory
+    DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
+    StartEndLessonDayCallbackFactory
 from services.services import NUMERIC_DATE
 
 
@@ -65,7 +66,9 @@ def create_authorization_kb():
             [InlineKeyboardButton(text='Мое расписание',
                                   callback_data='show_schedule')],
             [InlineKeyboardButton(text='Настройки',
-                                  callback_data='setting_student')],
+                                  callback_data='settings_student')],
+            [InlineKeyboardButton(text='Штрафы',
+                                  callback_data='penalties')],
             [InlineKeyboardButton(text='<назад',
                                   callback_data='student_entrance')]
         ],
@@ -74,7 +77,7 @@ def create_authorization_kb():
     return authorization_kb
 
 
-def show_next_seven_days_kb(*days):
+def show_next_seven_days_settings_kb(*days):
     buttons = [
                   [InlineKeyboardButton(text=f'{cur_date.strftime("%d.%m")} - '
                                              f'{NUMERIC_DATE[date(year=cur_date.year,
@@ -169,9 +172,78 @@ def create_delete_lessons_menu(dict_for_6_lessons,
     builder.button(text='<<',
                    callback_data='move_left_remove')
     builder.button(text='>>',
-                   callback_data='move_right_right')
+                   callback_data='move_right_remove')
     builder.button(text='выйти',
                    callback_data=week_date_str)
 
     builder.adjust(2, 2, 2, 2, 1)
     return builder.as_markup()
+
+
+def show_next_seven_days_schedule_kb(*days):
+    buttons = [
+                  [InlineKeyboardButton(text=f'{cur_date.strftime("%d.%m")} - '
+                                             f'{NUMERIC_DATE[date(year=cur_date.year,
+                                                                  month=cur_date.month,
+                                                                  day=cur_date.day).isoweekday()]}',
+                                        callback_data=ShowDaysOfScheduleCallbackFactory(
+                                            week_date=cur_date.strftime("%Y-%m-%d")
+                                        ).pack()
+                                        )
+                   ]
+                  for cur_date in days
+              ] + [[InlineKeyboardButton(text='<назад',
+                                         callback_data='auth_student')]]
+
+    next_seven_days_with_cur_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+    return next_seven_days_with_cur_kb
+
+
+def all_lessons_for_day_kb(lessons):
+    builder = InlineKeyboardBuilder()
+    buttons = []
+    for lesson in lessons:
+        buttons.append(
+            InlineKeyboardButton(
+                text=f'{lesson['start'].strftime("%H:%M")} - {lesson['finished'].strftime("%H:%M")}',
+                callback_data=StartEndLessonDayCallbackFactory
+                    (
+                    lesson_on=lesson['start'].strftime("%H:%M"),
+                    lesson_off=lesson['finished'].strftime("%H:%M")
+                ).pack()
+            )
+        )
+    buttons.append(InlineKeyboardButton(text='<назад',
+                                        callback_data='show_schedule')
+                   )
+
+    builder.row(*buttons, width=1)
+    return builder.as_markup()
+
+
+def create_button_for_back_to_all_lessons_day(week_date):
+    button_for_back_to_all_lessons_day = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text='<назад',
+                                  callback_data=ShowDaysOfScheduleCallbackFactory(
+                                      week_date=week_date
+                                  ).pack()
+                                  )
+             ]
+        ]
+    )
+
+    return button_for_back_to_all_lessons_day
+
+
+def create_settings_profile_kb():
+    settings_profile_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text='Заполнить заново',
+                                  callback_data='edit_profile')],
+            [InlineKeyboardButton(text='❌Удалить профиль❌',
+                                  callback_data='delete_profile')]
+        ]
+    )
+
+    return settings_profile_kb

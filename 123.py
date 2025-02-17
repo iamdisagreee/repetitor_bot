@@ -82,8 +82,8 @@ print(d)
 # print(1%9)
 # print({day: [] for day in range(1, 7)})
 
-a = [[1,2], [1, 3]]
-
-if [1, 4] in a:
-    print(123123)
-else: print(0000)
+b = []
+a = {1: 'a', 2: 'b'}
+b.append(a)
+a = {1: 'c', 2: 'b'}
+print(b)

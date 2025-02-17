@@ -103,3 +103,43 @@ def create_delete_time_student(lessons_busy):
         record += 1
     pprint(slots, indent=4)
     return slots
+
+
+def show_all_lessons_for_day(all_lessons_for_day):
+    result = []
+    all_lessons_for_day = list(all_lessons_for_day)
+    cur_list = {'start': all_lessons_for_day[0].lesson_start,
+                'finished': all_lessons_for_day[0].lesson_finished}
+
+    for lesson in all_lessons_for_day[1:]:
+        cur_start = lesson.lesson_start
+        cur_finished = lesson.lesson_finished
+
+        if cur_list['finished'] == cur_start:
+            cur_list['finished'] = cur_finished
+        else:
+            result.append(cur_list)
+            cur_list = {'start': cur_start,
+                        'finished': cur_finished}
+    result.append(cur_list)
+    return result
+
+
+# Функция, которая проверяет, оплачены или нет занятия для выбранного промежутка!
+def give_result_status_timeinterval(information_of_status_lesson):
+    counter_status = 0
+    counter_len = 0
+    #print(information_of_status_lesson)
+    for lesson in information_of_status_lesson:
+        if lesson.status:
+            counter_status += 1
+        counter_len += 1
+
+    return counter_status == counter_len, counter_len
+
+
+def give_result_info(result_status):
+    if result_status:
+        return '✅ Оплата принята ✅'
+    else:
+        return '❌ Ожидается оплата ❌'

@@ -10,10 +10,12 @@ from pydantic import json
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 
+from callback_factory.student import ShowDaysOfScheduleCallbackFactory
 from database import Student, LessonWeek, LessonDay
 from database.student_requirements import give_lessons_week_for_day, give_all_busy_time_intervals, \
-    give_teacher_id_by_student_id
-from services.services import give_list_with_days, give_date_format_fsm, create_choose_time_student
+    give_teacher_id_by_student_id, give_all_lessons_for_day
+from services.services import give_list_with_days, give_date_format_fsm, create_choose_time_student, \
+    create_delete_time_student
 
 
 class IsStudentInDatabase(BaseFilter):
@@ -46,12 +48,13 @@ class IsMoveRightAddMenu(BaseFilter):
         state_dict = await state.get_data()
         week_date_str = state_dict['week_date']
         week_date = give_date_format_fsm(week_date_str)
-        lessons_week = await give_lessons_week_for_day(session, week_date)
 
-        teacher_id = await give_teacher_id_by_student_id(session,
+        student = await give_teacher_id_by_student_id(session,
                                                          callback.from_user.id)
+        lessons_week = await give_lessons_week_for_day(session, week_date, student.teacher_id)
+
         lessons_busy = await give_all_busy_time_intervals(session,
-                                                          teacher_id,
+                                                          student.teacher_id,
                                                           week_date)
 
         dict_lessons = create_choose_time_student(lessons_week, lessons_busy)
@@ -65,8 +68,9 @@ class IsMoveRightAddMenu(BaseFilter):
         return (await state.get_data())['page'] + 1 < page
 
 
-class IsMoveLeftAddMenu(BaseFilter):
+class IsMoveLeftMenu(BaseFilter):
     async def __call__(self, callback: CallbackQuery, state: FSMContext, session: AsyncSession):
+        print('DAY_LEFT', (await state.get_data())['page'])
         return (await state.get_data())['page'] - 1 >= 1
 
 
@@ -74,14 +78,14 @@ class IsTeacherDidSlots(BaseFilter):
     async def __call__(self, callback: CallbackQuery, session: AsyncSession, state: FSMContext):
         state_dict = await state.get_data()
         week_date = give_date_format_fsm(state_dict['week_date'])
-        teacher_id = await give_teacher_id_by_student_id(session,
+        student = await give_teacher_id_by_student_id(session,
                                                          callback.from_user.id)
 
         result = await session.execute(
             select(LessonWeek)
             .where(
                 and_(LessonWeek.week_date == week_date,
-                     LessonWeek.teacher_id == teacher_id)
+                     LessonWeek.teacher_id == student.teacher_id)
             )
         )
         # print(week_date, teacher_id)
@@ -103,3 +107,35 @@ class IsStudentChooseSlots(BaseFilter):
             )
         )
         return result.scalar()
+
+
+class IsMoveRightRemoveMenu(BaseFilter):
+    async def __call__(self, callback: CallbackQuery, session: AsyncSession, state: FSMContext):
+        state_dict = await state.get_data()
+        week_date_str = state_dict['week_date']
+        week_date = give_date_format_fsm(week_date_str)
+
+        all_busy_lessons = await give_all_lessons_for_day(session,
+                                                          week_date,
+                                                          callback.from_user.id)
+        dict_for_6_lessons = create_delete_time_student(all_busy_lessons)
+
+        day_page = 1
+        for day, value in dict_for_6_lessons.items():
+            if not value:
+                day_page = day
+                break
+
+        return state_dict['page'] + 1 < day_page
+
+
+class IsLessonsInChoseDay(BaseFilter):
+    async def __call__(self, callback: CallbackQuery, session: AsyncSession, state: FSMContext,
+                       callback_data: ShowDaysOfScheduleCallbackFactory):
+        week_date = give_date_format_fsm(callback_data.week_date)
+
+        all_lessons_for_day_not_ordered = await give_all_lessons_for_day(session,
+                                                                         week_date,
+                                                                         callback.from_user.id)
+
+        return all_lessons_for_day_not_ordered.first()

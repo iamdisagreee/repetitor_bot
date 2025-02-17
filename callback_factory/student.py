@@ -21,3 +21,12 @@ class DeleteFieldCallbackFactory(CallbackData, prefix='delete', sep='-'):
 
 class EmptyRemoveFieldCallbackFactory(CallbackData, prefix='plug'):
     plug: str
+
+
+class ShowDaysOfScheduleCallbackFactory(CallbackData, prefix='schedule'):
+    week_date: str
+
+
+class StartEndLessonDayCallbackFactory(CallbackData, prefix='start_end_lesson', sep='-'):
+    lesson_on: str
+    lesson_off: str
