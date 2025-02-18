@@ -41,8 +41,8 @@ async def main():
     session_maker = async_sessionmaker(engine)
 
     dp.include_router(everyone_handlers.router)
-    #dp.include_router(student_handlers.router)
-    dp.include_router(teacher_handlers.router)
+    dp.include_router(student_handlers.router)
+    #dp.include_router(teacher_handlers.router)
 
 
     dp.update.outer_middleware(DbSessionMiddleware(session_maker))

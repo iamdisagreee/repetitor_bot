@@ -51,6 +51,7 @@ def give_list_registrations_str(res_time):
     return '\n'.join(result_line)
 
 
+########################################## СТУДЕНТ ###############################
 # Создаем словарь словарей в котором хранятся все ячейки для выбора студентом дат
 def create_choose_time_student(lessons_week, lessons_busy):
     list_busy = [[lesson.lesson_start, lesson.lesson_finished] for lesson in lessons_busy]
@@ -129,7 +130,7 @@ def show_all_lessons_for_day(all_lessons_for_day):
 def give_result_status_timeinterval(information_of_status_lesson):
     counter_status = 0
     counter_len = 0
-    #print(information_of_status_lesson)
+    # print(information_of_status_lesson)
     for lesson in information_of_status_lesson:
         if lesson.status:
             counter_status += 1
@@ -143,3 +144,49 @@ def give_result_info(result_status):
         return '✅ Оплата принята ✅'
     else:
         return '❌ Ожидается оплата ❌'
+
+
+############################################## УЧИТЕЛЬ #########################################3
+def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
+    cur_buttons = []
+    last_one = {'lesson_on': -1,
+                'lesson_off': -1,
+                'student_id': -1,
+                'list_status': []}
+    for interval in list_lessons_not_formatted:
+        if interval.lessons:
+            lessons_sort = sorted(interval.lessons, key=lambda gap: gap.lesson_start)
+            if lessons_sort[0].lesson_start == last_one['lesson_off'] and \
+                    lessons_sort[0].student_id == last_one['student_id']:
+                cur_buttons.remove(last_one)
+                interval_result = {
+                    'lesson_on': last_one['lesson_on'],
+                    'lesson_off': lessons_sort[0].lesson_finished,
+                    'student_id': last_one['student_id'],
+                    'list_status': last_one['list_status']
+                }
+            else:
+                interval_result = {'lesson_on': lessons_sort[0].lesson_start,
+                                   'lesson_off': lessons_sort[0].lesson_finished,
+                                   'student_id': lessons_sort[0].student_id,
+                                   'list_status': [lessons_sort[0].status]
+                                   }
+
+            index = 1
+            while index < len(lessons_sort):
+                gap = lessons_sort[index]
+                if interval_result['lesson_off'] == gap.lesson_start:
+                    interval_result['lesson_off'] = gap.lesson_finished
+                    interval_result['list_status'].append(gap.status)
+                else:
+                    cur_buttons.append(interval_result)
+                    interval_result = {'lesson_on': gap.lesson_start,
+                                       'lesson_off': gap.lesson_finished,
+                                       'student_id': gap.student_id,
+                                       'list_status': [gap.status]}
+                index += 1
+
+            cur_buttons.append(interval_result)
+            last_one = interval_result
+    #print(cur_buttons)
+    return cur_buttons

@@ -1,8 +1,13 @@
-from datetime import date
+from datetime import date, time
 
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.utils.keyboard import InlineKeyboardBuilder
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from callback_factory.teacher import ShowDaysOfPayCallbackFactory
+from callback_factory.teacher import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
+    DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
+     DeleteDayScheduleCallbackFactory
+from database.teacher_requirements import give_student_by_student_id, give_student_by_student_id
 from services.services import NUMERIC_DATE
 
 
@@ -41,6 +46,8 @@ def create_authorization_kb():
                                   callback_data='schedule_teacher')],
             [InlineKeyboardButton(text='Подтверждение оплаты',
                                   callback_data='confirmation_pay')],
+            [InlineKeyboardButton(text='Мое расписание',
+                                  callback_data='schedule_show')],
             [InlineKeyboardButton(text='<назад',
                                   callback_data='teacher_entrance')
              ]
@@ -95,7 +102,12 @@ def create_all_records_week_day(weeks_day):
                   [InlineKeyboardButton(
                       text=f'{week_day.work_start.strftime("%H:%M")} - '
                            f'{week_day.work_end.strftime("%H:%M")}',
-                      callback_data=f'del_record_teacher_{week_day.week_id}')]
+                      callback_data=DeleteDayCallbackFactory
+                          (
+                          week_id=week_day.week_id
+                      ).pack()
+                  )
+                  ]
                   for week_day in weeks_day
               ] + [
                   [InlineKeyboardButton(
@@ -125,3 +137,133 @@ def show_next_seven_days_pay_kb(*days):
 
     next_seven_days_with_cur_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
     return next_seven_days_with_cur_kb
+
+
+async def show_status_lesson_day_kb(cur_buttons,
+                                    session: AsyncSession,
+                                    week_date_str: str):
+    builder = InlineKeyboardBuilder()
+    res_buttons = []
+
+    for button in cur_buttons:
+        # print(button)
+        student = await give_student_by_student_id(session, button['student_id'])
+        price = student.price / 2 * len(button['list_status'])
+        status = '✅' if len(button['list_status']) == sum(button['list_status']) else '❌'
+        res_buttons.append(
+            InlineKeyboardButton(
+                text=f'{status} {student.name} {button['lesson_on'].strftime("%H:%M")} - '
+                     f'{button['lesson_off'].strftime("%H:%M")} {price} руб.',
+                callback_data=EditStatusPayCallbackFactory(
+                    lesson_on=button['lesson_on'].strftime("%H:%M"),
+                    lesson_off=button['lesson_off'].strftime("%H:%M"),
+                    week_date=week_date_str,
+                ).pack()
+            )
+        )
+
+    res_buttons.append(
+        InlineKeyboardButton(text='<назад',
+                             callback_data='confirmation_pay'
+                             )
+    )
+
+    builder.row(*res_buttons, width=1)
+
+    return builder.as_markup()
+
+
+def show_next_seven_days_schedule_teacher_kb(*days):
+    buttons = [
+                  [InlineKeyboardButton(text=f'{cur_date.strftime("%d.%m")} - '
+                                             f'{NUMERIC_DATE[date(year=cur_date.year,
+                                                                  month=cur_date.month,
+                                                                  day=cur_date.day).isoweekday()]}',
+                                        callback_data=ShowDaysOfScheduleTeacherCallbackFactory(
+                                            week_date=cur_date.strftime("%Y-%m-%d")
+                                        ).pack()
+                                        )
+                   ]
+                  for cur_date in days
+              ] + [[InlineKeyboardButton(text='<назад',
+                                         callback_data='auth_teacher')]]
+
+    next_seven_days_with_cur_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+    return next_seven_days_with_cur_kb
+
+
+def show_schedule_lesson_day_kb(cur_buttons,
+                                session: AsyncSession,
+                                week_date_str: str):
+    builder = InlineKeyboardBuilder()
+    res_buttons = []
+
+    for button in cur_buttons:
+        # print(button)
+        # student = await give_student_by_student_id(session, button['student_id'])
+        # price = student.price / 2 * len(button['list_status'])
+        status_bool = len(button['list_status']) == sum(button['list_status'])
+        status = '✅' if status_bool else '❌'
+        res_buttons.append(
+            InlineKeyboardButton(
+                text=f'{status} {button['lesson_on'].strftime("%H:%M")} - '
+                     f'{button['lesson_off'].strftime("%H:%M")}',
+                callback_data=ShowInfoDayCallbackFactory(
+                    lesson_on=button['lesson_on'].strftime("%H:%M"),
+                    lesson_off=button['lesson_off'].strftime("%H:%M"),
+                    week_date=week_date_str,
+                    status=status_bool
+                ).pack()
+            )
+        )
+
+    # res_buttons.append(InlineKeyboardButton(text='Редактировать',
+    #                                         callback_data=ShowDeleteLessonCallbackFactory(
+    #                                             week_date=week_date_str
+    #                                         ).pack()
+    #                                         )
+    #                    )
+
+    res_buttons.append(
+        InlineKeyboardButton(text='<назад',
+                             callback_data='schedule_show'
+                             )
+    )
+
+    builder.row(*res_buttons, width=1)
+
+    return builder.as_markup()
+
+
+def back_to_show_or_delete_schedule_teacher(week_date_str,
+                                            lesson_on,
+                                            lesson_off):
+    return InlineKeyboardMarkup(inline_keyboard=
+    [
+        [InlineKeyboardButton(text='Удалить',
+                              callback_data=DeleteDayScheduleCallbackFactory(
+                                  week_date=week_date_str,
+                                  lesson_on=lesson_on,
+                                  lesson_off=lesson_off
+                              ).pack()
+                              )],
+        [InlineKeyboardButton(text='<назад',
+                              callback_data=ShowDaysOfScheduleTeacherCallbackFactory(
+                                  week_date=week_date_str
+                              ).pack()
+                              )
+         ]
+    ]
+    )
+
+
+def back_to_show_schedule_teacher(week_date_str):
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='<назад',
+                              callback_data=ShowDaysOfScheduleTeacherCallbackFactory(
+                                  week_date=week_date_str
+                              ).pack()
+                              )
+         ]
+    ]
+    )
