@@ -1,6 +1,7 @@
 from datetime import datetime, date, time
+from uuid import UUID
 
-from sqlalchemy import BigInteger, Date, func, Integer, ForeignKey, Time, text, Boolean, ForeignKeyConstraint
+from sqlalchemy import BigInteger, Date, Uuid, ForeignKey, Time, text, Boolean, ForeignKeyConstraint, Uuid
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from sqlalchemy.sql import expression
 
@@ -12,24 +13,16 @@ from . import lesson_week, student
 class LessonDay(Base):
     __tablename__ = 'lessons_day'
 
-    lesson_id: Mapped[int] = mapped_column(Integer, primary_key=True,
-                                           autoincrement=True)
+    lesson_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True)
 
-    # week_id: Mapped[int] = mapped_column(
-    #     BigInteger,
-    #     ForeignKey('lessons_week.week_id'),
-    # )
-
-    week_id: Mapped[int] = mapped_column(Integer)
+    week_id: Mapped[UUID] = mapped_column(Uuid)
 
     week_date: Mapped[date] = mapped_column(
         Date,
-        #ForeignKey('lessons_week.week_date'),
     )
 
     teacher_id: Mapped[int] = mapped_column(
         BigInteger,
-        #ForeignKey('teachers.teacher_id'),
     )
 
     student_id: Mapped[int] = mapped_column(
@@ -50,7 +43,7 @@ class LessonDay(Base):
     status: Mapped[bool] = mapped_column(Boolean,
                                          nullable=True,
                                          server_default=expression.false(),
-                                        )
+                                         )
 
     __table_args__ = (ForeignKeyConstraint(['week_id', 'week_date', 'teacher_id'],
                                            [lesson_week.LessonWeek.week_id,

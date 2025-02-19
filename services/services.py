@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta, date, time
 from pprint import pprint
-
+NUMBER_FINES = 3
 NUMERIC_DATE = {1: 'понедельник',
                 2: 'вторник',
                 3: 'среда',

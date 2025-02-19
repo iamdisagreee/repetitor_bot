@@ -82,10 +82,10 @@ print(d)
 # print(1%9)
 # print({day: [] for day in range(1, 7)})
 
-c = []
-a = {1: 'a', 2: 'b'}
-b = {1: 'c', 2: 'b'}
-c.append(a)
-c.append(b)
-
-print(d in c)
+# c = []
+# a = {1: 'a', 2: 'b'}
+# b = {1: 'c', 2: 'b'}
+# c.append(a)
+# c.append(b)
+#
+# print(d in c)

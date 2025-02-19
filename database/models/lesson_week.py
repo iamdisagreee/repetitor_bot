@@ -1,6 +1,6 @@
 from datetime import date, time
-
-from sqlalchemy import BigInteger, Date, func, Integer, ForeignKey, Time, PrimaryKeyConstraint
+from uuid import UUID
+from sqlalchemy import BigInteger, Date, ForeignKey, Time, Uuid, text
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 
 from database.base import Base
@@ -12,7 +12,9 @@ from . import teacher, lesson_day
 class LessonWeek(Base):
     __tablename__ = 'lessons_week'
 
-    week_id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    week_id: Mapped[UUID] = mapped_column(Uuid,
+                                          primary_key=True,
+                                          server_default=text("gen_random_uuid()"))
 
     week_date: Mapped[date] = mapped_column(
         Date(),
@@ -34,4 +36,4 @@ class LessonWeek(Base):
     teacher: Mapped["teacher.Teacher"] = relationship(back_populates='weeks',
                                                       )
     lessons: Mapped[list["lesson_day.LessonDay"]] = relationship(back_populates='week',
-                                                                 )
+                                                                 cascade='delete')

@@ -16,5 +16,4 @@ class DbSessionMiddleware(BaseMiddleware):
                        data: Dict[str, Any]):
         async with self.session_pool() as session:
             data["session"] = session
-            #pprint(data, compact=True)
             return await handler(event, data)

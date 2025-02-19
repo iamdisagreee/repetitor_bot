@@ -5,7 +5,7 @@ from sqlalchemy.orm import mapped_column, Mapped, relationship
 
 from database.base import Base
 # from database import Teacher, LessonDay
-from . import teacher, lesson_day
+from . import teacher, lesson_day, penalties
 
 
 class Student(Base):
@@ -34,4 +34,7 @@ class Student(Base):
     teacher: Mapped["teacher.Teacher"] = relationship(back_populates='students',
                                                       )
     lessons: Mapped[list["lesson_day.LessonDay"]] = relationship(back_populates='student',
-                                                                 )
+                                                                 cascade='delete')
+
+    penalties: Mapped[list["penalties.Penalty"]] = relationship(back_populates='student',
+                                                                cascade='delete')

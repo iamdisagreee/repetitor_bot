@@ -13,14 +13,16 @@ from callback_factory.teacher import ShowDaysOfPayCallbackFactory, EditStatusPay
     DeleteDayScheduleCallbackFactory
 from database.teacher_requirements import command_add_teacher, command_add_lesson_week, give_installed_lessons_week, \
     delete_week_day, give_all_lessons_day_by_week_day, change_status_pay_student, \
-    give_information_of_one_lesson, delete_lesson
+    give_information_of_one_lesson, delete_lesson, delete_teacher_profile
 from filters.teacher_filters import IsTeacherInDatabase, IsLessonWeekInDatabaseCallback, \
     FindNextSevenDaysFromKeyboard, IsCorrectFormatInput, IsNoEndBiggerStart, IsDifferenceThirtyMinutes, \
     IsNoConflictWithStart, IsNoConflictWithEnd, IsRemoveNameRight, IsLessonWeekInDatabaseState, IsSomethingToConfirm
+from keyboards.everyone_kb import create_start_kb
 from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb, create_authorization_kb, \
     show_next_seven_days_kb, create_back_to_profile_kb, create_add_remove_gap_kb, create_all_records_week_day, \
     show_next_seven_days_pay_kb, show_status_lesson_day_kb, show_next_seven_days_schedule_teacher_kb, \
-    show_schedule_lesson_day_kb, back_to_show_schedule_teacher, back_to_show_or_delete_schedule_teacher
+    show_schedule_lesson_day_kb, back_to_show_schedule_teacher, back_to_show_or_delete_schedule_teacher, \
+    settings_teacher_kb
 from services.services import give_list_with_days, give_time_format_fsm, give_date_format_fsm, \
     give_list_registrations_str, show_intermediate_information_lesson_day_status, give_result_info
 
@@ -30,6 +32,9 @@ router = Router()
 class FSMRegistrationTeacherForm(StatesGroup):
     fill_name = State()
     fill_surname = State()
+    fill_phone = State()
+    fill_bank = State()
+    fill_penalty = State()
 
 
 class FSMRegistrationLessonWeek(StatesGroup):
@@ -66,15 +71,31 @@ async def process_name_sent(message: Message, state: FSMContext):
     await state.set_state(FSMRegistrationTeacherForm.fill_surname)
 
 
-@router.message(StateFilter(FSMRegistrationTeacherForm.fill_name))
-async def process_wrong_name_sent(message: Message):
-    await message.answer(text='То, что вы отправили не похоже на имя(\n\n'
-                              'Пожалуйста, введите ваше имя!')
-
-
 @router.message(StateFilter(FSMRegistrationTeacherForm.fill_surname), F.text.isalpha())
-async def process_surname_sent(message: Message, state: FSMContext, session: AsyncSession):
+async def process_surname_sent(message: Message, state: FSMContext):
     await state.update_data(surname=message.text)
+    await message.answer(text="Спасибо!\n\n А теперь введите номер телефона!")
+    await state.set_state(FSMRegistrationTeacherForm.fill_phone)
+
+
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_phone))  # Фильтр для номера)
+async def process_phone_sent(message: Message, state: FSMContext):
+    await state.update_data(phone=message.text)
+    await message.answer(text="Спасибо!\n\n А теперь введите названия банка/банков!")
+    await state.set_state(FSMRegistrationTeacherForm.fill_bank)
+
+
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_bank))
+async def process_bank_sent(message: Message, state: FSMContext):
+    await state.update_data(bank=message.text)
+
+    await message.answer(text="Спасибо!\n\n А теперь введите пенальти!")
+    await state.set_state(FSMRegistrationTeacherForm.fill_penalty)
+
+
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_penalty))
+async def process_bank_sent(message: Message, state: FSMContext, session: AsyncSession):
+    await state.update_data(penalty=message.text)
 
     teacher_form = await state.get_data()
     await command_add_teacher(session,
@@ -85,6 +106,12 @@ async def process_surname_sent(message: Message, state: FSMContext, session: Asy
     await message.answer(text="Спасибо, что ввели данные!\n\n"
                               "Нажми на кнопку, чтобы вернуться!!!",
                          reply_markup=create_back_to_entrance_kb())
+
+
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_name))
+async def process_wrong_name_sent(message: Message):
+    await message.answer(text='То, что вы отправили не похоже на имя(\n\n'
+                              'Пожалуйста, введите ваше имя!')
 
 
 @router.message(StateFilter(FSMRegistrationTeacherForm.fill_surname))
@@ -98,12 +125,6 @@ async def process_wrong_surname_sent(message: Message):
 async def process_not_start_registration(callback: CallbackQuery):
     await callback.answer(text='Вы уже зарегестрированы!')
 
-
-# @router.callback_query(F.text == 'Регистрация', IsTeacherInDatabase())
-# async def process_not_start_registration(callback: CallbackQuery):
-#     await callback.answer(text='Вы уже зарегестрированы!')
-
-# Логика авторизации учителя
 
 # Случай, когда учитель не зарегестрирован, но нажал на кнопку авторизации!
 @router.callback_query(F.data == 'auth_teacher', ~IsTeacherInDatabase())
@@ -119,7 +140,7 @@ async def process_start_authorization(callback: CallbackQuery):
                                      reply_markup=create_authorization_kb())
 
 
-# Кнопка __расписание__ -> Добавление, Удаление
+# Кнопка __расписание__  -> Выбираем день, с которым работаем!
 @router.callback_query(F.data == 'schedule_teacher')
 async def process_show_schedule(callback: CallbackQuery):
     next_seven_days_with_cur = give_list_with_days(datetime.now())
@@ -135,7 +156,7 @@ async def process_menu_add_remove(callback: CallbackQuery, state: FSMContext):
     await state.update_data(week_date=callback.data)
 
     await callback.message.edit_text(text='Выберите что вы хотите сделать с раписанием!',
-                                     reply_markup=create_add_remove_gap_kb(back='<<назад'))
+                                     reply_markup=create_add_remove_gap_kb())
 
 
 ########################## Случай, когда сработала кнока __добавить__! ######################################
@@ -422,3 +443,28 @@ async def process_delete_lesson(callback: CallbackQuery, session: AsyncSession,
 
     await callback.message.edit_text(text='Удаление произошло успешно!',
                                      reply_markup=back_to_show_schedule_teacher(callback_data.week_date))
+
+
+########################################## Кнопка __Настройки__ в главном меню ################################
+@router.callback_query(F.data == 'settings_teacher')
+async def process_show_settings(callback: CallbackQuery):
+    await callback.message.edit_text(text='Выберите, что хотите сделать!',
+                                     reply_markup=settings_teacher_kb())
+
+
+# Нажали на кнопку Заполнить профиль заново
+@router.callback_query(F.data == 'edit_profile')
+async def process_restart_registration(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text(text="Пожалуйста, введите ваше имя!",
+                                     )
+    await state.set_state(FSMRegistrationTeacherForm.fill_name)
+
+
+# Нажали на кнопку Удалить профиль
+@router.callback_query(F.data == 'delete_profile')
+async def process_delete_profile(callback: CallbackQuery, session: AsyncSession):
+    await delete_teacher_profile(session,
+                                 callback.from_user.id)
+
+    await callback.message.edit_text(text="Здравствуйте, выберите роль!",
+                                     reply_markup=create_start_kb())

@@ -13,17 +13,19 @@ from database.models.teacher import Teacher
 async def command_add_teacher(session: AsyncSession,
                               teacher_id: int,
                               name: str,
-                              surname: str):
-    result = await session.execute(select(Teacher)
-                                   .where(Teacher.teacher_id == teacher_id))
+                              surname: str,
+                              phone: str,
+                              bank: str,
+                              penalty: int):
+    teacher = Teacher(teacher_id=teacher_id,
+                      name=name,
+                      surname=surname,
+                      phone=phone,
+                      bank=bank,
+                      penalty=penalty)
 
-    if result.scalar() is None:
-        teacher = Teacher(teacher_id=teacher_id,
-                          name=name,
-                          surname=surname)
-
-        session.add(teacher)
-        await session.commit()
+    await session.merge(teacher)
+    await session.commit()
 
 
 # Добавляем день, в котором будет хранится информация о занятиях
@@ -122,13 +124,20 @@ async def change_status_pay_student(session: AsyncSession,
         .order_by(LessonDay.lesson_start)
     )
 
+    list_lessons = {}
     for lesson_day in lesson_days.scalars():
-        # print(lesson_day.lesson_start, lesson_day.lesson_finished)
-        if lesson_day.status:
-            lesson_day.status = False
-        else:
-            lesson_day.status = True
-    # print(lesson_day.status)
+    # Проверяем случай, когда занятие оплачено, но добавился новый промежуток
+        list_lessons[lesson_day.status] = lesson_day
+    if sum(list_lessons.keys()) != len(list_lessons.keys()) and sum(list_lessons.keys()) > 0:
+        for lesson_day_u in list_lessons.values():
+            lesson_day_u.status = False
+    else:
+        for lesson_day_u in list_lessons.values():
+            if lesson_day_u.status:
+                lesson_day_u.status = False
+            else:
+                lesson_day_u.status = True
+
     await session.commit()
 
 
@@ -172,4 +181,15 @@ async def delete_lesson(session: AsyncSession,
 
     for lesson in delete_lessons.scalars():
         await session.delete(lesson)
+    await session.commit()
+
+
+async def delete_teacher_profile(session: AsyncSession,
+                                 teacher_id: int):
+    profile = await session.execute(
+        select(Teacher)
+        .where(Teacher.teacher_id == teacher_id)
+    )
+
+    await session.delete(profile.scalar())
     await session.commit()

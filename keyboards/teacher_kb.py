@@ -48,6 +48,8 @@ def create_authorization_kb():
                                   callback_data='confirmation_pay')],
             [InlineKeyboardButton(text='Мое расписание',
                                   callback_data='schedule_show')],
+            [InlineKeyboardButton(text='Настройки',
+                                  callback_data='settings_teacher')],
             [InlineKeyboardButton(text='<назад',
                                   callback_data='teacher_entrance')
              ]
@@ -72,15 +74,15 @@ def show_next_seven_days_kb(*days, back):
     return next_seven_days_with_cur_kb
 
 
-def create_add_remove_gap_kb(back: str):
+def create_add_remove_gap_kb():
     add_remove_gap_kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text='Добавить',
                                   callback_data='add_gap_teacher')],
             [InlineKeyboardButton(text='Удалить',
                                   callback_data='remove_gap_teacher')],
-            [InlineKeyboardButton(text=back,
-                                  callback_data='auth_teacher')]
+            [InlineKeyboardButton(text='<назад',
+                                  callback_data='schedule_teacher')]
         ]
     )
 
@@ -267,3 +269,20 @@ def back_to_show_schedule_teacher(week_date_str):
          ]
     ]
     )
+
+
+def settings_teacher_kb():
+    settings_teacher = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text='Заполнить профиль заново',
+                                  callback_data='edit_profile')],
+            [InlineKeyboardButton(text='❌Удалить профиль❌',
+                                  callback_data='delete_profile')],
+            [InlineKeyboardButton(text='<назад',
+                                  callback_data='auth_teacher')]
+        ]
+    )
+
+    return settings_teacher
+
+

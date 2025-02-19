@@ -242,7 +242,9 @@ def create_settings_profile_kb():
             [InlineKeyboardButton(text='Заполнить заново',
                                   callback_data='edit_profile')],
             [InlineKeyboardButton(text='❌Удалить профиль❌',
-                                  callback_data='delete_profile')]
+                                  callback_data='delete_profile')],
+            [InlineKeyboardButton(text='<назад',
+                                  callback_data='auth_student')]
         ]
     )
 

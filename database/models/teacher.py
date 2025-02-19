@@ -1,10 +1,9 @@
 from datetime import date, datetime
 
-from sqlalchemy import BigInteger, String, DateTime, func, ForeignKey
+from sqlalchemy import BigInteger, String, DateTime, func, ForeignKey, Time, Integer, text
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 
 from database.base import Base
-# from database import Student, LessonWeek
 from . import student, lesson_week
 
 
@@ -14,6 +13,10 @@ class Teacher(Base):
     teacher_id: Mapped[int] = mapped_column(primary_key=True, type_=BigInteger)
     name: Mapped[str] = mapped_column(String)
     surname: Mapped[str] = mapped_column(String)
+    phone: Mapped[str] = mapped_column(String)
+    bank: Mapped[str] = mapped_column(String)
+    penalty: Mapped[int] = mapped_column(Integer)
+
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
         nullable=False,
