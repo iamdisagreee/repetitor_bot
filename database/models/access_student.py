@@ -1,11 +1,13 @@
 from datetime import datetime
 
 from sqlalchemy import BigInteger, Boolean, DateTime
-from sqlalchemy.orm import mapped_column, Mapped
+from sqlalchemy.orm import mapped_column, Mapped, relationship
 from sqlalchemy.sql import expression
 from sqlalchemy.sql.functions import func
 
 from database.base import Base
+
+from . import teacher, student
 
 
 class AccessStudent(Base):
@@ -18,3 +20,6 @@ class AccessStudent(Base):
 
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True),
                                                  server_default=func.now())
+
+    student: Mapped["student.Student"] = relationship(back_populates='access',
+                                                      cascade='delete')

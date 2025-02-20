@@ -53,15 +53,13 @@ def give_list_registrations_str(res_time):
 
 ########################################## СТУДЕНТ ###############################
 # Создаем словарь словарей в котором хранятся все ячейки для выбора студентом дат
-def create_choose_time_student(lessons_week, lessons_busy):
+def create_choose_time_student(lessons_week, lessons_busy, week_date):
     list_busy = [[lesson.lesson_start, lesson.lesson_finished] for lesson in lessons_busy]
     slots = {day: [] for day in range(1, 9)}
     page_slots = 1
     record = 0
-
+    now = datetime.now()
     for lesson_week in lessons_week:
-
-        now = datetime.now()
 
         start_time = datetime(year=now.year, month=now.month, day=now.day,
                               hour=lesson_week.work_start.hour, minute=lesson_week.work_start.minute)
@@ -81,7 +79,10 @@ def create_choose_time_student(lessons_week, lessons_busy):
             start_time += delta_30
             cur_dict['lesson_end'] = time(hour=start_time.hour, minute=start_time.minute)
 
-            if [cur_dict['lesson_start'], cur_dict['lesson_end']] in list_busy:
+            if [cur_dict['lesson_start'], cur_dict['lesson_end']] in list_busy: #
+                    # or \
+                    # now > datetime(year=week_date.year, month=week_date.month, day=week_date.day,
+                    #                hour=cur_dict['lesson_start'].hour, minute=cur_dict['lesson_end'].minute)):
                 continue
 
             slots[page_slots].append(cur_dict)
@@ -190,3 +191,4 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
             last_one = interval_result
     #print(cur_buttons)
     return cur_buttons
+

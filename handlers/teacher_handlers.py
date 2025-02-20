@@ -8,21 +8,26 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.fsm.state import StatesGroup, State, default_state
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
+from callback_factory.student import ChangeStatusOfAddListCallbackFactory, DeleteStudentToStudyCallbackFactory
 from callback_factory.teacher import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
-    DeleteDayScheduleCallbackFactory
+    DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory
 from database.teacher_requirements import command_add_teacher, command_add_lesson_week, give_installed_lessons_week, \
     delete_week_day, give_all_lessons_day_by_week_day, change_status_pay_student, \
-    give_information_of_one_lesson, delete_lesson, delete_teacher_profile
+    give_information_of_one_lesson, delete_lesson, delete_teacher_profile, give_student_id_by_teacher_id, \
+    give_penalty_by_teacher_id, give_all_students_by_teacher, change_status_entry_student, add_student_id_in_database, \
+    delete_student_id_in_database, give_all_students_by_teacher_penalties
 from filters.teacher_filters import IsTeacherInDatabase, IsLessonWeekInDatabaseCallback, \
     FindNextSevenDaysFromKeyboard, IsCorrectFormatInput, IsNoEndBiggerStart, IsDifferenceThirtyMinutes, \
-    IsNoConflictWithStart, IsNoConflictWithEnd, IsRemoveNameRight, IsLessonWeekInDatabaseState, IsSomethingToConfirm
+    IsNoConflictWithStart, IsNoConflictWithEnd, IsRemoveNameRight, IsLessonWeekInDatabaseState, IsSomethingToConfirm, \
+    IsPenaltyNow
 from keyboards.everyone_kb import create_start_kb
 from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb, create_authorization_kb, \
     show_next_seven_days_kb, create_back_to_profile_kb, create_add_remove_gap_kb, create_all_records_week_day, \
     show_next_seven_days_pay_kb, show_status_lesson_day_kb, show_next_seven_days_schedule_teacher_kb, \
     show_schedule_lesson_day_kb, back_to_show_schedule_teacher, back_to_show_or_delete_schedule_teacher, \
-    settings_teacher_kb
+    settings_teacher_kb, create_management_students_kb, create_list_add_students_kb, \
+    create_back_to_management_students_kb, create_list_delete_students_kb, show_list_of_debtors_kb
 from services.services import give_list_with_days, give_time_format_fsm, give_date_format_fsm, \
     give_list_registrations_str, show_intermediate_information_lesson_day_status, give_result_info
 
@@ -40,6 +45,10 @@ class FSMRegistrationTeacherForm(StatesGroup):
 class FSMRegistrationLessonWeek(StatesGroup):
     fill_work_start = State()
     fill_work_end = State()
+
+
+class FSMAddStudentToStudy(StatesGroup):
+    fill_id = State()
 
 
 @router.message(Command(commands='cancel'))
@@ -334,21 +343,30 @@ async def process_show_status_student(callback: CallbackQuery, session: AsyncSes
 
 
 # Ловим нажатие на кнопку и меняем статус оплаты: ❌ -> ✅ ; ✅ -> ❌
-@router.callback_query(EditStatusPayCallbackFactory.filter())
+# Второй фильтр всегда __True__, но он проверяет, будет ли штраф!
+@router.callback_query(EditStatusPayCallbackFactory.filter(), IsPenaltyNow())
 async def process_edit_status_student(callback: CallbackQuery, session: AsyncSession,
                                       callback_data: EditStatusPayCallbackFactory):
     week_date_str = callback_data.week_date
     week_date = give_date_format_fsm(week_date_str)
     lesson_on = give_time_format_fsm(callback_data.lesson_on)
     lesson_off = give_time_format_fsm(callback_data.lesson_off)
-    # print(lesson_on, lesson_off)
 
+    # Получаем student_id по id учителя, дате занятия и началу занятия
+    student_id = await give_student_id_by_teacher_id(session,
+                                                  callback.from_user.id,
+                                                  week_date,
+                                                  lesson_on,
+                                                  )
+    #print('ЙЙЙЙЙЙЙ', student_id)
     # Меняем статус в базе данных
     await change_status_pay_student(session,
-                                    callback.from_user.id,
+                                    student_id,
                                     week_date,
                                     lesson_on,
                                     lesson_off)
+
+    # Поменяли status, теперь выводим нашу клавиатуру снова
 
     list_lessons_not_formatted = await give_all_lessons_day_by_week_day(session,
                                                                         callback.from_user.id,
@@ -468,3 +486,92 @@ async def process_delete_profile(callback: CallbackQuery, session: AsyncSession)
 
     await callback.message.edit_text(text="Здравствуйте, выберите роль!",
                                      reply_markup=create_start_kb())
+
+
+##################################### Управление учениками ###############################################
+
+@router.callback_query(F.data == 'management_students')
+async def process_management_students(callback: CallbackQuery):
+    await callback.message.edit_text(text='Выберите, что хотите сделать!',
+                                     reply_markup=create_management_students_kb())
+
+
+############################### Список добавленных студентов и их статус: '🔒'/ '🔑' #############################
+@router.callback_query(F.data == 'list_add_students')
+async def process_list_add_students(callback: CallbackQuery,
+                                    session: AsyncSession):
+    list_students = await give_all_students_by_teacher(session,
+                                                       callback.from_user.id)
+
+    await callback.message.edit_text(text='Список учеников:',
+                                     reply_markup=create_list_add_students_kb(list_students))
+
+
+# Меняем статус ученика на обратный '🔒' -> '🔑'/ '🔑' -> '🔒'
+@router.callback_query(ChangeStatusOfAddListCallbackFactory.filter())
+async def process_change_status_entry_student(callback: CallbackQuery, session: AsyncSession,
+                                              callback_data: ChangeStatusOfAddListCallbackFactory):
+    teacher_id = callback_data.student_id
+    await change_status_entry_student(session, teacher_id)
+
+    list_students = await give_all_students_by_teacher(session,
+                                                       callback.from_user.id)
+
+    await callback.message.edit_text(text='Список учеников:',
+                                     reply_markup=create_list_add_students_kb(list_students))
+
+
+#############3 Кнопка редактировать (тут можно удалять) ################
+@router.callback_query(F.data == 'delete_student_by_teacher')
+async def process_show_delete_student_by_teacher(callback: CallbackQuery, session: AsyncSession):
+    list_students = await give_all_students_by_teacher(session,
+                                                       callback.from_user.id)
+    await callback.message.edit_text(text='Нажми, чтобы удалить ученика!',
+                                     reply_markup=create_list_delete_students_kb(list_students))
+
+
+# Ловим айдишник удаления
+@router.callback_query(DeleteStudentToStudyCallbackFactory.filter())
+async def process_show_delete_student_by_teacher(callback: CallbackQuery, session: AsyncSession,
+                                                 callback_data: DeleteStudentToStudyCallbackFactory):
+    await delete_student_id_in_database(session,
+                                        callback_data.student_id)
+
+    list_students = await give_all_students_by_teacher(session,
+                                                       callback.from_user.id)
+
+    await callback.message.edit_text(text='Нажми, чтобы удалить ученика!',
+                                     reply_markup=create_list_delete_students_kb(list_students))
+
+
+######################################### Кнопка добавить ученика ####################################3
+@router.callback_query(F.data == 'allow_student')
+async def process_add_student_to_study(callback: CallbackQuery, state: FSMContext):
+    await callback.message.edit_text(text='Введите id ученика:')
+    await state.set_state(FSMAddStudentToStudy.fill_id)
+
+
+# Ловим введенный айдишник!
+@router.message(StateFilter(FSMAddStudentToStudy.fill_id))
+async def process_id_sent(message: Message, session: AsyncSession, state: FSMContext):
+    await add_student_id_in_database(session,
+                                     int(message.text)
+                                     )
+    await state.clear()
+    await message.answer(text='Ученик успешно добавлен!',
+                         reply_markup=create_back_to_management_students_kb())
+
+
+################################ Кнопка __Список должников__ #################################################
+@router.callback_query(F.data == 'list_debtors')
+async def process_show_list_debtors(callback: CallbackQuery, session: AsyncSession):
+    list_students = await give_all_students_by_teacher_penalties(session,
+                                                                 callback.from_user.id)
+
+    await callback.message.edit_text(text='Здесь вы увидите должников и их статистику',
+                                     reply_markup=show_list_of_debtors_kb(list_students))
+
+
+@router.callback_query(PlugPenaltyTeacherCallbackFactory.filter())
+async def process_show_list_debtors_plug(callback):
+    await callback.answer()

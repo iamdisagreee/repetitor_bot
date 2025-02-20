@@ -6,7 +6,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from callback_factory.student import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
-    StartEndLessonDayCallbackFactory
+    StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory
 from services.services import NUMERIC_DATE
 
 
@@ -249,3 +249,19 @@ def create_settings_profile_kb():
     )
 
     return settings_profile_kb
+
+
+def create_information_penalties(students_penalty):
+    #print(x.week_date for x in students_penalty.penalties)
+    buttons = [
+        [InlineKeyboardButton(text=f'{penalty.week_date} {penalty.lesson_on}'
+                                   f' - {penalty.lesson_off}',
+                              callback_data=PlugPenaltyStudentCallbackFactory(
+                                  plug=''
+                              ).pack())]
+        for penalty in students_penalty.penalties
+    ] + [[InlineKeyboardButton(text='<назад', callback_data='auth_student')]]
+
+    information_penalties_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+
+    return information_penalties_kb

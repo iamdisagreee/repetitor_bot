@@ -30,3 +30,19 @@ class ShowDaysOfScheduleCallbackFactory(CallbackData, prefix='schedule'):
 class StartEndLessonDayCallbackFactory(CallbackData, prefix='start_end_lesson', sep='-'):
     lesson_on: str
     lesson_off: str
+
+
+class ChangeStatusOfAddListCallbackFactory(CallbackData, prefix='change_status'):
+    student_id: int
+
+
+class AddStudentToStudyCallbackFactory(CallbackData, prefix='add_student'):
+    student_id: int
+
+
+class DeleteStudentToStudyCallbackFactory(CallbackData, prefix='delete_student'):
+    student_id: int
+
+
+class PlugPenaltyStudentCallbackFactory(CallbackData, prefix='plug'):
+    plug: str

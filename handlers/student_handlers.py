@@ -13,19 +13,19 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
 from callback_factory.student import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
-    StartEndLessonDayCallbackFactory
+    StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory
 from database.student_requirements import command_get_all_teachers, command_add_students, give_lessons_week_for_day, \
     add_lesson_day, give_teacher_id_by_student_id, give_all_busy_time_intervals, \
     give_all_lessons_for_day, remove_lesson_day, give_week_id_by_teacher_id, give_all_information_teacher, \
-    give_information_of_lesson, delete_student_profile
+    give_information_of_lesson, delete_student_profile, give_students_penalty
 from filters.student_filters import IsStudentInDatabase, IsInputFieldAlpha, IsInputFieldDigit, \
     FindNextSevenDaysFromKeyboard, IsMoveRightAddMenu, IsMoveLeftMenu, IsTeacherDidSlots, IsStudentChooseSlots, \
-    IsMoveRightRemoveMenu, IsLessonsInChoseDay
+    IsMoveRightRemoveMenu, IsLessonsInChoseDay, IsTimeNotExpired
 from keyboards.everyone_kb import create_start_kb
 from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, create_level_choice_kb, \
     create_back_to_entrance_kb, create_authorization_kb, show_next_seven_days_settings_kb, create_menu_add_remove_kb, \
     create_choose_time_student_kb, create_delete_lessons_menu, show_next_seven_days_schedule_kb, all_lessons_for_day_kb, \
-    create_button_for_back_to_all_lessons_day, create_settings_profile_kb
+    create_button_for_back_to_all_lessons_day, create_settings_profile_kb, create_information_penalties
 from services.services import give_list_with_days, create_choose_time_student, give_date_format_fsm, \
     give_time_format_fsm, create_delete_time_student, show_all_lessons_for_day, give_result_status_timeinterval, \
     give_result_info
@@ -258,7 +258,7 @@ async def process_menu_add_remove(callback: CallbackQuery, state: FSMContext):
                                      reply_markup=create_menu_add_remove_kb())
 
 
-###################################### Кнопка добавить ########################################3
+###################################### Кнопка ДОБАВИТЬ ########################################3
 # Нажимаем добавить, открываем меню со свободными слотами
 @router.callback_query(F.data == 'add_gap_student', IsTeacherDidSlots())
 async def process_add_time_study(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
@@ -275,7 +275,7 @@ async def process_add_time_study(callback: CallbackQuery, session: AsyncSession,
                                                       week_date)
 
     lessons_week = await give_lessons_week_for_day(session, week_date, student.teacher_id)
-    dict_lessons = create_choose_time_student(lessons_week, lessons_busy)
+    dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date)
 
     await callback.message.edit_text(text='Выбери слот старта занятия!\n'
                                           'Все слоты по 30 минут!\n'
@@ -303,7 +303,7 @@ async def process_move_right_add_menu(callback: CallbackQuery, session: AsyncSes
                                                       week_date)
 
     lessons_week = await give_lessons_week_for_day(session, week_date, student.teacher_id)
-    dict_lessons = create_choose_time_student(lessons_week, lessons_busy)
+    dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date)
 
     await callback.message.edit_text(text='Выбери слот старта занятия!\n'
                                           'Все слоты по 30 минут!\n'
@@ -331,7 +331,7 @@ async def process_move_right_add_menu(callback: CallbackQuery, session: AsyncSes
                                                       week_date)
 
     lessons_week = await give_lessons_week_for_day(session, week_date, student.teacher_id)
-    dict_lessons = create_choose_time_student(lessons_week, lessons_busy)
+    dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date)
 
     await callback.message.edit_text(text='Выбери слот старта занятия!\n'
                                           'Все слоты по 30 минут!',
@@ -388,7 +388,7 @@ async def process_touch_menu_add(callback: CallbackQuery, session: AsyncSession,
                                                       week_date)
 
     lessons_week = await give_lessons_week_for_day(session, week_date, student.teacher_id)
-    dict_lessons = create_choose_time_student(lessons_week, lessons_busy)
+    dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date)
     page = state_dict['page']
     await callback.message.edit_text(text='Выбери слот старта занятия!\n'
                                           'Все слоты по 30 минут!',
@@ -430,8 +430,8 @@ async def process_remove_time_study(callback: CallbackQuery, session: AsyncSessi
                                                                              page))
 
 
-# Настраиваем удаление записей по нажатию на кнопку!
-@router.callback_query(DeleteFieldCallbackFactory.filter())
+# Настраиваем удаление записей по нажатию на кнопку! + Ограничение по удалению не наступило!
+@router.callback_query(DeleteFieldCallbackFactory.filter(), IsTimeNotExpired())
 async def process_touch_menu_remove(callback: CallbackQuery, session: AsyncSession, state: FSMContext,
                                     callback_data: DeleteFieldCallbackFactory):
     state_dict = await state.get_data()
@@ -504,6 +504,12 @@ async def process_not_remove_time_study(callback: CallbackQuery):
     await callback.answer(text='Нечего удалять!')
 
 
+# Случай, когда мы не можем удалить, потому что время отмены истекло!
+@router.callback_query(DeleteFieldCallbackFactory.filter(), ~IsTimeNotExpired())
+async def process_not_touch_menu_remove(callback: CallbackQuery):
+    await callback.answer(text='Время удаления истекло!')
+
+
 # Случай, когда нажимаем на пустую кнопку
 @router.callback_query(EmptyRemoveFieldCallbackFactory.filter())
 async def process_touch_empty_button(callback: CallbackQuery):
@@ -532,6 +538,7 @@ async def process_show_schedule(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(text='Выберите дату вашего расписания!',
                                      reply_markup=show_next_seven_days_schedule_kb(*next_seven_days_with_cur))
     await state.clear()
+
 
 # Выбираем день занятия (нажимаем на этот день)
 @router.callback_query(ShowDaysOfScheduleCallbackFactory.filter(), IsLessonsInChoseDay())
@@ -611,9 +618,22 @@ async def process_change_settings_profile(callback: CallbackQuery, state: FSMCon
 
 @router.callback_query(F.data == 'delete_profile')
 async def process_delete_profile(callback: CallbackQuery, session: AsyncSession):
-
     await delete_student_profile(session,
                                  callback.from_user.id)
     await callback.message.edit_text(text="Здравствуйте, выберите роль!",
                                      reply_markup=create_start_kb())
 
+
+######################################## Кнопка ШТРАФЫ #############################################
+@router.callback_query(F.data == 'penalties')
+async def process_penalties(callback: CallbackQuery, session: AsyncSession):
+    students_penalty = await give_students_penalty(session, callback.from_user.id)
+
+    await callback.message.edit_text(text='Ваши пенальти!',
+                                     reply_markup=create_information_penalties(students_penalty))
+
+
+# Нажатие на кнопки с информацией - ничего не должно происходить
+@router.callback_query(PlugPenaltyStudentCallbackFactory.filter())
+async def process_not_penalties(callback: CallbackQuery):
+    await callback.answer()

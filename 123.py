@@ -89,3 +89,11 @@ print(d)
 # c.append(b)
 #
 # print(d in c)
+# penalty_delta = timedelta(hours=1)
+# #lesson_start = give_time_format_fsm(callback_data.lesson_start)
+# cur_delta = timedelta(hours=12, minutes=30)
+# now_delta = timedelta(hours=datetime.now().hour, minutes=datetime.now().minute)
+#
+# print(now_delta < cur_delta - penalty_delta)
+a = [1,2,3]
+print(len(a))

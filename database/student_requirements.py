@@ -2,6 +2,7 @@ from datetime import datetime, date, time
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
+from sqlalchemy.orm import selectinload
 
 from database import Student, LessonDay
 from database.models.lesson_week import LessonWeek
@@ -170,7 +171,8 @@ async def give_all_information_teacher(session: AsyncSession,
 
     return result.scalar()
 
-#Все интервалы, которые лежат в уроке
+
+# Все интервалы, которые лежат в уроке
 async def give_information_of_lesson(session: AsyncSession,
                                      student_id: int,
                                      week_date: date,
@@ -195,6 +197,19 @@ async def give_information_of_lesson(session: AsyncSession,
 async def delete_student_profile(session: AsyncSession,
                                  student_id: int):
     profile = await session.execute(select(Student)
-                              .where(Student.student_id == student_id))
+                                    .where(Student.student_id == student_id))
     await session.delete(profile.scalar())
     await session.commit()
+
+
+async def give_students_penalty(session: AsyncSession,
+                                student_id: int):
+    students = await session.execute(
+        select(Student)
+        .where(
+            Student.student_id == student_id
+        )
+        .options(selectinload(Student.penalties))
+    )
+
+    return students.scalar()

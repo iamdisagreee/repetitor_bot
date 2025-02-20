@@ -5,13 +5,17 @@ from sqlalchemy.orm import mapped_column, Mapped, relationship
 
 from database.base import Base
 # from database import Teacher, LessonDay
-from . import teacher, lesson_day, penalties
+from . import teacher, lesson_day, penalties, access_student
 
 
 class Student(Base):
     __tablename__ = 'students'
 
-    student_id: Mapped[int] = mapped_column(BigInteger, primary_key=True)
+    student_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('access_students.student_id',
+                                                                   ondelete='cascade'),
+                                            primary_key=True,
+                                            )
+
     name: Mapped[str] = mapped_column(String(50))
     surname: Mapped[str] = mapped_column(String(50))
     city: Mapped[str] = mapped_column(String(50))
@@ -38,3 +42,5 @@ class Student(Base):
 
     penalties: Mapped[list["penalties.Penalty"]] = relationship(back_populates='student',
                                                                 cascade='delete')
+
+    access: Mapped["access_student.AccessStudent"] = relationship(back_populates='student')

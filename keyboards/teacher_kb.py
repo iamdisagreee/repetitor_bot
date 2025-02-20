@@ -1,12 +1,15 @@
 from datetime import date, time
 
+from sqlalchemy import select
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from callback_factory.student import ChangeStatusOfAddListCallbackFactory, DeleteStudentToStudyCallbackFactory
 from callback_factory.teacher import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
-     DeleteDayScheduleCallbackFactory
+    DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory
+from database import AccessStudent
 from database.teacher_requirements import give_student_by_student_id, give_student_by_student_id
 from services.services import NUMERIC_DATE
 
@@ -50,6 +53,8 @@ def create_authorization_kb():
                                   callback_data='schedule_show')],
             [InlineKeyboardButton(text='Настройки',
                                   callback_data='settings_teacher')],
+            [InlineKeyboardButton(text='Управление учениками',
+                                  callback_data='management_students')],
             [InlineKeyboardButton(text='<назад',
                                   callback_data='teacher_entrance')
              ]
@@ -271,6 +276,7 @@ def back_to_show_schedule_teacher(week_date_str):
     )
 
 
+# Клавиатура управления действиями
 def settings_teacher_kb():
     settings_teacher = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -286,3 +292,73 @@ def settings_teacher_kb():
     return settings_teacher
 
 
+# Клавиатура для выбора что сделать с учениками!
+def create_management_students_kb():
+    buttons = [
+        [InlineKeyboardButton(text='Список добавленных',
+                              callback_data='list_add_students')],
+        [InlineKeyboardButton(text='Добавить',
+                              callback_data='allow_student')],
+        [InlineKeyboardButton(text='Список должников',
+                              callback_data='list_debtors')],
+        [InlineKeyboardButton(text='<назад',
+                              callback_data='auth_teacher')]
+    ]
+
+    management_students_kb = InlineKeyboardMarkup(
+        inline_keyboard=buttons
+    )
+
+    return management_students_kb
+
+
+# Клавиатура из всех учеников и их доступа к боту!
+def create_list_add_students_kb(students):
+    buttons = []
+    for student in students:
+        status_str = ['🔒', '🔑'][student.access.status]
+        buttons.append([
+            InlineKeyboardButton(text=f'{status_str} {student.surname} {student.name}',
+                                 callback_data=ChangeStatusOfAddListCallbackFactory(
+                                     student_id=student.student_id
+                                 ).pack())
+        ]
+        )
+    buttons.append([InlineKeyboardButton(text='Редактировать', callback_data='delete_student_by_teacher')])
+    buttons.append([InlineKeyboardButton(text='<назад', callback_data='management_students')])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def create_list_delete_students_kb(students):
+    buttons = []
+    for student in students:
+        status_str = ['🔒', '🔑'][student.access.status]
+        buttons.append([
+            InlineKeyboardButton(text=f'{status_str} {student.surname} {student.name}',
+                                 callback_data=DeleteStudentToStudyCallbackFactory(
+                                     student_id=student.student_id
+                                 ).pack())
+        ]
+        )
+    buttons.append([InlineKeyboardButton(text='<выйти', callback_data='management_students')])
+    return InlineKeyboardMarkup(inline_keyboard=buttons)
+
+
+def create_back_to_management_students_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text='<назад',
+                              callback_data='management_students')]
+    ])
+
+
+# Клавиатура которая показывает всех учеников со штрафами
+def show_list_of_debtors_kb(students):
+    return InlineKeyboardMarkup(inline_keyboard=[
+                                                    [InlineKeyboardButton(
+                                                        text=f'{student.surname} {student.name} пенальти: {len(student.penalties)}',
+                                                        callback_data=PlugPenaltyTeacherCallbackFactory(
+                                                            plug=''
+                                                        ).pack())]
+                                                    for student in students
+                                                ] + [[InlineKeyboardButton(text='<назад',
+                                                                           callback_data='management_students')]])

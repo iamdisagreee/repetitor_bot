@@ -44,7 +44,7 @@ async def main():
     # print("МОИ МОДЕЛИ")
     # for table_name in Base.metadata.tables.keys():
     #     print(table_name)
-
+    #
     # async with engine.begin() as connection:
     #     await connection.run_sync(Base.metadata.drop_all)
     #     await connection.run_sync(Base.metadata.create_all)
@@ -55,15 +55,15 @@ async def main():
     session_maker = async_sessionmaker(engine)
 
     dp.include_router(everyone_handlers.router)
-    # dp.include_router(student_handlers.router)
-    dp.include_router(teacher_handlers.router)
+    dp.include_router(student_handlers.router)
+    #dp.include_router(teacher_handlers.router)
 
     dp.update.outer_middleware(DbSessionMiddleware(session_maker))
 
     # Удаление по расписанию (раз в день)!
-    scheduler = AsyncIOScheduler()
-    scheduler.add_job(delete_old_records, 'interval', days=3, args=(session_maker,))  # Runs daily
-    scheduler.start()
+    # scheduler = AsyncIOScheduler()
+    # scheduler.add_job(delete_old_records, 'interval', days=3, args=(session_maker,))  # Runs daily
+    # scheduler.start()
 
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)

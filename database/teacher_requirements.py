@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
-from database import LessonDay, Student
+from database import LessonDay, Student, AccessStudent
 from database.models.lesson_week import LessonWeek
 from database.models.teacher import Teacher
 
@@ -126,7 +126,7 @@ async def change_status_pay_student(session: AsyncSession,
 
     list_lessons = {}
     for lesson_day in lesson_days.scalars():
-    # Проверяем случай, когда занятие оплачено, но добавился новый промежуток
+        # Проверяем случай, когда занятие оплачено, но добавился новый промежуток
         list_lessons[lesson_day.status] = lesson_day
     if sum(list_lessons.keys()) != len(list_lessons.keys()) and sum(list_lessons.keys()) > 0:
         for lesson_day_u in list_lessons.values():
@@ -193,3 +193,118 @@ async def delete_teacher_profile(session: AsyncSession,
 
     await session.delete(profile.scalar())
     await session.commit()
+
+
+async def give_student_id_by_teacher_id(session: AsyncSession,
+                                        teacher_id,
+                                        week_date,
+                                        lesson_on):
+    student_id = await session.execute(
+        select(LessonDay.student_id)
+        .where(
+            and_(
+                LessonDay.week_date == week_date,
+                LessonDay.teacher_id == teacher_id,
+                LessonDay.lesson_start == lesson_on
+            )
+        )
+    )
+
+    return student_id.scalar()
+
+
+async def give_penalty_by_teacher_id(session: AsyncSession,
+                                     teacher_id: int):
+    result = await session.execute(
+        select(Teacher.penalty)
+        .where(Teacher.teacher_id == teacher_id)
+    )
+
+    return result.scalar()
+
+
+# Список всех учеников для репетитора
+async def give_all_students_by_teacher(session: AsyncSession,
+                                       teacher_id: int):
+    result = await session.execute(
+        select(Student)
+        .where(Student.teacher_id == teacher_id)
+        .order_by(Student.surname)
+        .options(selectinload(Student.access))
+    )
+
+    return result.scalars()
+
+
+# Меняем статус ученика на обратный '🔒' -> '🔑'/ '🔑' -> '🔒'
+async def change_status_entry_student(session: AsyncSession,
+                                      student_id: int):
+    student = (
+        await session.execute(
+            select(AccessStudent)
+            .where(AccessStudent.student_id == student_id)
+        )
+    ).scalar()
+
+    student.status = not student.status
+    await session.commit()
+
+
+# Добавляем ученика в базу данных, то есть даем ему возможность начать регистрацию
+
+async def add_student_id_in_database(session: AsyncSession,
+                                     student_id: int):
+    accessStudent = AccessStudent(student_id=student_id)
+
+    session.add(accessStudent)
+    await session.commit()
+
+
+async def delete_student_id_in_database(session: AsyncSession,
+                                        student_id: int):
+    accessStudent = await session.execute(
+        select(AccessStudent)
+        .where(AccessStudent.student_id == student_id)
+    )
+
+    await session.delete(accessStudent.scalar())
+    await session.commit()
+
+
+async def give_all_students_by_teacher_penalties(session: AsyncSession,
+                                                 teacher_id: int):
+    result = await session.execute(
+        select(Student)
+        .where(Student.teacher_id == teacher_id)
+        .options(selectinload(Student.penalties))
+    )
+
+    return result.scalars()
+
+
+# Получаем студента со всей вытекающей по его teacher_id, week_date, lesson_on
+async def give_student_by_teacher_id(session: AsyncSession,
+                                     teacher_id,
+                                     week_date,
+                                     lesson_on):
+    student_id = (await session.execute(
+        select(LessonDay.student_id)
+        .where(
+            and_(
+                LessonDay.week_date == week_date,
+                LessonDay.teacher_id == teacher_id,
+                LessonDay.lesson_start == lesson_on
+            )
+        )
+    )).scalar()
+
+    student = await session.execute(
+        select(Student)
+        .where(Student.student_id == student_id)
+        .options(
+            selectinload(Student.access),
+            selectinload(Student.penalties)
+        )
+    )
+
+    return student.scalar()

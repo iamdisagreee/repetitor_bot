@@ -1,5 +1,5 @@
 import re
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, time
 from pprint import pprint
 from typing import Dict, Any
 
@@ -7,11 +7,13 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import BaseFilter
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, delete
 
-from callback_factory.teacher import ShowDaysOfPayCallbackFactory
-from database import Teacher, LessonWeek, LessonDay
-from database.teacher_requirements import give_installed_lessons_week
+from callback_factory.teacher import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory
+from database import Teacher, LessonWeek, LessonDay, Student
+from database.models import Penalty
+from database.teacher_requirements import give_installed_lessons_week, give_student_id_by_teacher_id, \
+    give_penalty_by_teacher_id, give_student_by_teacher_id
 from services.services import give_list_with_days, give_date_format_callback, give_date_format_fsm, give_time_format_fsm
 
 
@@ -167,7 +169,6 @@ class IsLessonWeekInDatabaseState(BaseFilter):
 class IsSomethingToConfirm(BaseFilter):
     async def __call__(self, callback: CallbackQuery, session: AsyncSession,
                        callback_data: ShowDaysOfPayCallbackFactory):
-
         week_date_str = callback_data.week_date
         week_date = give_date_format_fsm(week_date_str)
 
@@ -177,3 +178,42 @@ class IsSomethingToConfirm(BaseFilter):
         )
 
         return result.scalar()
+
+
+# Проверка наступило ли время для пенальти или нет.
+# Если наступило, то добавляем в таблицу penalties.
+# Если количество пенальти == 2, то баним
+class IsPenaltyNow(BaseFilter):
+    async def __call__(self, callback: CallbackQuery, session: AsyncSession,
+                       callback_data: EditStatusPayCallbackFactory):
+
+        teacher_penalty = await give_penalty_by_teacher_id(session,
+                                                           callback.from_user.id)
+        if not teacher_penalty:
+            return True
+
+        week_date = give_date_format_fsm(callback_data.week_date)
+        lesson_on = give_time_format_fsm(callback_data.lesson_on)
+        lesson_off = give_time_format_fsm(callback_data.lesson_off)
+        time_now = time(hour=datetime.now().hour, minute=datetime.now().minute)
+
+        student = await give_student_by_teacher_id(session,
+                                                   callback.from_user.id,
+                                                   week_date,
+                                                   lesson_on)
+
+        if teacher_penalty and time_now > lesson_on:
+            if len(student.penalties) >= 2:
+                student.access.status = False
+                to_delete = delete(Student).where(Student.student_id == student.student_id)
+                await session.execute(to_delete)
+
+            else:
+                penalty = Penalty(student_id=student.student_id,
+                                  week_date=week_date,
+                                  lesson_on=lesson_on,
+                                  lesson_off=lesson_off)
+                session.add(penalty)
+            await session.commit()
+
+        return True
