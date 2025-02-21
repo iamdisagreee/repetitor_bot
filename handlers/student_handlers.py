@@ -20,7 +20,7 @@ from database.student_requirements import command_get_all_teachers, command_add_
     give_information_of_lesson, delete_student_profile, give_students_penalty
 from filters.student_filters import IsStudentInDatabase, IsInputFieldAlpha, IsInputFieldDigit, \
     FindNextSevenDaysFromKeyboard, IsMoveRightAddMenu, IsMoveLeftMenu, IsTeacherDidSlots, IsStudentChooseSlots, \
-    IsMoveRightRemoveMenu, IsLessonsInChoseDay, IsTimeNotExpired
+    IsMoveRightRemoveMenu, IsLessonsInChoseDay, IsTimeNotExpired, IsFreeSlots, IsTeacherDidSystemPenalties, IsStudentHasPenalties
 from keyboards.everyone_kb import create_start_kb
 from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, create_level_choice_kb, \
     create_back_to_entrance_kb, create_authorization_kb, show_next_seven_days_settings_kb, create_menu_add_remove_kb, \
@@ -260,7 +260,7 @@ async def process_menu_add_remove(callback: CallbackQuery, state: FSMContext):
 
 ###################################### Кнопка ДОБАВИТЬ ########################################3
 # Нажимаем добавить, открываем меню со свободными слотами
-@router.callback_query(F.data == 'add_gap_student', IsTeacherDidSlots())
+@router.callback_query(F.data == 'add_gap_student', IsTeacherDidSlots(), IsFreeSlots())
 async def process_add_time_study(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
     state_dict = await state.get_data()
     week_date_str = state_dict['week_date']
@@ -409,6 +409,12 @@ async def process_touch_empty_button(callback: CallbackQuery):
 @router.callback_query(F.data == 'add_gap_student', ~IsTeacherDidSlots())
 async def process_teacher_did_not_slots(callback: CallbackQuery):
     await callback.answer("Репетитор еще не выставил слоты!")
+
+
+# Случай, когда свободных занятий больше нет!
+@router.callback_query(F.data == 'add_gap_student', ~IsFreeSlots())
+async def process_not_add_time_study(callback: CallbackQuery):
+    await callback.answer("Свободных мест больше нет!")
 
 
 ###################################### Кнопка удалить ###########################################
@@ -625,7 +631,7 @@ async def process_delete_profile(callback: CallbackQuery, session: AsyncSession)
 
 
 ######################################## Кнопка ШТРАФЫ #############################################
-@router.callback_query(F.data == 'penalties')
+@router.callback_query(F.data == 'penalties', IsTeacherDidSystemPenalties(), IsStudentHasPenalties())
 async def process_penalties(callback: CallbackQuery, session: AsyncSession):
     students_penalty = await give_students_penalty(session, callback.from_user.id)
 
@@ -637,3 +643,15 @@ async def process_penalties(callback: CallbackQuery, session: AsyncSession):
 @router.callback_query(PlugPenaltyStudentCallbackFactory.filter())
 async def process_not_penalties(callback: CallbackQuery):
     await callback.answer()
+
+
+# Случай, когда учитель не установил систему пенальти!
+@router.callback_query(F.data == 'penalties', ~IsTeacherDidSystemPenalties())
+async def process_not_work_penalties(callback: CallbackQuery):
+    await callback.answer('Ваш репетитор отключил систему пенальти!')
+
+
+# Случай, когда у ученика нет пенальти!
+@router.callback_query(F.data == 'penalties', ~IsStudentHasPenalties())
+async def process_not_penalties(callback: CallbackQuery):
+    await callback.answer('У вас нет пенальти!')

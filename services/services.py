@@ -1,5 +1,6 @@
 from datetime import datetime, timedelta, date, time
 from pprint import pprint
+
 NUMBER_FINES = 3
 NUMERIC_DATE = {1: 'понедельник',
                 2: 'вторник',
@@ -18,11 +19,8 @@ def give_list_with_days(get_date: datetime):
 
     for days in range(NUMBER_DAYS + 1):
         next_date = get_date + timedelta(days=days)
-        # format_date = next_date.strftime('%d.%m')
         name_date = date(year=next_date.year, month=next_date.month, day=next_date.day)
         result_date.append(name_date)
-    # day, month = list(map(int, '28.01 - пятница'[:5].split('.')))
-    # print(day, month)
     return result_date
 
 
@@ -79,10 +77,10 @@ def create_choose_time_student(lessons_week, lessons_busy, week_date):
             start_time += delta_30
             cur_dict['lesson_end'] = time(hour=start_time.hour, minute=start_time.minute)
 
-            if [cur_dict['lesson_start'], cur_dict['lesson_end']] in list_busy: #
-                    # or \
-                    # now > datetime(year=week_date.year, month=week_date.month, day=week_date.day,
-                    #                hour=cur_dict['lesson_start'].hour, minute=cur_dict['lesson_end'].minute)):
+            if [cur_dict['lesson_start'], cur_dict['lesson_end']] in list_busy or \
+                    now >= datetime(year=week_date.year, month=week_date.month, day=week_date.day,
+                                    hour=cur_dict['lesson_start'].hour,
+                                    minute=cur_dict['lesson_start'].minute):
                 continue
 
             slots[page_slots].append(cur_dict)
@@ -189,6 +187,5 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
 
             cur_buttons.append(interval_result)
             last_one = interval_result
-    #print(cur_buttons)
+    # print(cur_buttons)
     return cur_buttons
-

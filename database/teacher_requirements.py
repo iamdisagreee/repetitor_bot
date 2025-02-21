@@ -1,5 +1,5 @@
 from datetime import datetime, date, time
-
+from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
@@ -62,7 +62,7 @@ async def give_installed_lessons_week(session: AsyncSession,
 
 
 async def delete_week_day(session: AsyncSession,
-                          week_id: int):
+                          week_id: UUID):
     stmt = select(LessonWeek).where(LessonWeek.week_id == week_id)
 
     res_found = (await session.execute(stmt)).scalar()
@@ -250,6 +250,19 @@ async def change_status_entry_student(session: AsyncSession,
     await session.commit()
 
 
+# Получаем статус ученика
+async def give_status_entry_student(session: AsyncSession,
+                                    student_id: int):
+    student_status = (
+        await session.execute(
+            select(AccessStudent.status)
+            .where(AccessStudent.student_id == student_id)
+        )
+    ).scalar()
+    print(student_status)
+    return student_status
+
+
 # Добавляем ученика в базу данных, то есть даем ему возможность начать регистрацию
 
 async def add_student_id_in_database(session: AsyncSession,
@@ -262,12 +275,12 @@ async def add_student_id_in_database(session: AsyncSession,
 
 async def delete_student_id_in_database(session: AsyncSession,
                                         student_id: int):
-    accessStudent = await session.execute(
+    access_student = await session.execute(
         select(AccessStudent)
         .where(AccessStudent.student_id == student_id)
     )
 
-    await session.delete(accessStudent.scalar())
+    await session.delete(access_student.scalar())
     await session.commit()
 
 
@@ -308,3 +321,16 @@ async def give_student_by_teacher_id(session: AsyncSession,
     )
 
     return student.scalar()
+
+
+# Удаляем все занятия ученика, если его забанили
+async def delete_all_lessons_student(session: AsyncSession,
+                                     student_id: int):
+    result = await session.execute(
+        select(LessonDay)
+        .where(LessonDay.student_id == student_id)
+    )
+
+    for student in result.scalars():
+        await session.delete(student)
+    await session.commit()

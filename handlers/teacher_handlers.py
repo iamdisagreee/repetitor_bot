@@ -12,15 +12,17 @@ from callback_factory.student import ChangeStatusOfAddListCallbackFactory, Delet
 from callback_factory.teacher import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
     DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory
+from database.student_requirements import delete_student_profile
 from database.teacher_requirements import command_add_teacher, command_add_lesson_week, give_installed_lessons_week, \
     delete_week_day, give_all_lessons_day_by_week_day, change_status_pay_student, \
     give_information_of_one_lesson, delete_lesson, delete_teacher_profile, give_student_id_by_teacher_id, \
     give_penalty_by_teacher_id, give_all_students_by_teacher, change_status_entry_student, add_student_id_in_database, \
-    delete_student_id_in_database, give_all_students_by_teacher_penalties
-from filters.teacher_filters import IsTeacherInDatabase, IsLessonWeekInDatabaseCallback, \
-    FindNextSevenDaysFromKeyboard, IsCorrectFormatInput, IsNoEndBiggerStart, IsDifferenceThirtyMinutes, \
+    delete_student_id_in_database, give_all_students_by_teacher_penalties, delete_all_lessons_student, \
+    give_status_entry_student
+from filters.teacher_filters import IsTeacherInDatabase, \
+    FindNextSevenDaysFromKeyboard, IsCorrectFormatTime, IsNoEndBiggerStart, IsDifferenceThirtyMinutes, \
     IsNoConflictWithStart, IsNoConflictWithEnd, IsRemoveNameRight, IsLessonWeekInDatabaseState, IsSomethingToConfirm, \
-    IsPenaltyNow
+    IsPenaltyNow, IsPhoneCorrectInput, IsBankCorrectInput, IsPenaltyCorrectInput, IsInputTimeLongerThanNow
 from keyboards.everyone_kb import create_start_kb
 from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb, create_authorization_kb, \
     show_next_seven_days_kb, create_back_to_profile_kb, create_add_remove_gap_kb, create_all_records_week_day, \
@@ -28,6 +30,7 @@ from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb,
     show_schedule_lesson_day_kb, back_to_show_schedule_teacher, back_to_show_or_delete_schedule_teacher, \
     settings_teacher_kb, create_management_students_kb, create_list_add_students_kb, \
     create_back_to_management_students_kb, create_list_delete_students_kb, show_list_of_debtors_kb
+from lexicon.lexicon_teacher import LEXICON_TEACHER
 from services.services import give_list_with_days, give_time_format_fsm, give_date_format_fsm, \
     give_list_registrations_str, show_intermediate_information_lesson_day_status, give_result_info
 
@@ -51,58 +54,63 @@ class FSMAddStudentToStudy(StatesGroup):
     fill_id = State()
 
 
-@router.message(Command(commands='cancel'))
-async def process_restart_state(message: Message, state: FSMContext):
-    await state.clear()
-    await message.answer("Состояние очищено!")
+# @router.message(Command(commands='cancel'))
+# async def process_restart_state(message: Message, state: FSMContext):
+#     await state.clear()
+#     await message.answer("Состояние очищено!")
 
 
 ############################### Логика входа в меню идентификации #######################################
-@router.callback_query(F.data == 'teacher_entrance', StateFilter(default_state))
+@router.callback_query(F.data == 'teacher_entrance')
 async def process_entrance(callback: CallbackQuery):
     teacher_entrance_kb = create_entrance_kb()
-    await callback.message.edit_text(text='Меню идентификации!',
+    await callback.message.edit_text(text=LEXICON_TEACHER['menu_identification'],
                                      reply_markup=teacher_entrance_kb)
 
 
 #################################### Логика регистрации учителя #####################################
 @router.callback_query(F.data == 'reg_teacher', ~IsTeacherInDatabase(), StateFilter(default_state))
 async def process_start_registration(callback: CallbackQuery, state: FSMContext):
-    await callback.message.edit_text(text="Пожалуйста, введите ваше имя!",
+    await callback.message.edit_text(text=LEXICON_TEACHER['fill_name'],
                                      )
     await state.set_state(FSMRegistrationTeacherForm.fill_name)
 
 
+# Введено имя, просим ввести фамилию
 @router.message(StateFilter(FSMRegistrationTeacherForm.fill_name), F.text.isalpha())
 async def process_name_sent(message: Message, state: FSMContext):
-    await state.update_data(name=message.text)
-    await message.answer(text="Спасибо!\n\n А теперь введите фамилию!")
+    await state.update_data(name=message.text.capitalize())
+    await message.answer(text=LEXICON_TEACHER['fill_surname'])
     await state.set_state(FSMRegistrationTeacherForm.fill_surname)
 
 
+# Введена фамилия, просим ввести номер телефона
 @router.message(StateFilter(FSMRegistrationTeacherForm.fill_surname), F.text.isalpha())
 async def process_surname_sent(message: Message, state: FSMContext):
-    await state.update_data(surname=message.text)
-    await message.answer(text="Спасибо!\n\n А теперь введите номер телефона!")
+    await state.update_data(surname=message.text.capitalize())
+    await message.answer(text=LEXICON_TEACHER['fill_phone'])
     await state.set_state(FSMRegistrationTeacherForm.fill_phone)
 
 
-@router.message(StateFilter(FSMRegistrationTeacherForm.fill_phone))  # Фильтр для номера)
+# Введен телефон, просим ввести банк/банки
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_phone), IsPhoneCorrectInput())
 async def process_phone_sent(message: Message, state: FSMContext):
     await state.update_data(phone=message.text)
-    await message.answer(text="Спасибо!\n\n А теперь введите названия банка/банков!")
+    await message.answer(text=LEXICON_TEACHER['fill_bank'])
     await state.set_state(FSMRegistrationTeacherForm.fill_bank)
 
 
-@router.message(StateFilter(FSMRegistrationTeacherForm.fill_bank))
+# Введен банк/банки, просим ввести пенальти
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_bank), IsBankCorrectInput())
 async def process_bank_sent(message: Message, state: FSMContext):
     await state.update_data(bank=message.text)
 
-    await message.answer(text="Спасибо!\n\n А теперь введите пенальти!")
+    await message.answer(text=LEXICON_TEACHER['fill_penalty'])
     await state.set_state(FSMRegistrationTeacherForm.fill_penalty)
 
 
-@router.message(StateFilter(FSMRegistrationTeacherForm.fill_penalty))
+# Ввели пенальти, сохраняем данные и чистим состояние
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_penalty), IsPenaltyCorrectInput())
 async def process_bank_sent(message: Message, state: FSMContext, session: AsyncSession):
     await state.update_data(penalty=message.text)
 
@@ -112,91 +120,114 @@ async def process_bank_sent(message: Message, state: FSMContext, session: AsyncS
                               **teacher_form)
     await state.clear()
 
-    await message.answer(text="Спасибо, что ввели данные!\n\n"
-                              "Нажми на кнопку, чтобы вернуться!!!",
+    await message.answer(text=LEXICON_TEACHER['access_registration_profile'],
                          reply_markup=create_back_to_entrance_kb())
 
 
+# Случай, когда неправильно ввели имя
 @router.message(StateFilter(FSMRegistrationTeacherForm.fill_name))
 async def process_wrong_name_sent(message: Message):
-    await message.answer(text='То, что вы отправили не похоже на имя(\n\n'
-                              'Пожалуйста, введите ваше имя!')
+    await message.answer(text=LEXICON_TEACHER['not_fill_name'])
 
 
+# Случай, когда неправильно ввели фамилию
 @router.message(StateFilter(FSMRegistrationTeacherForm.fill_surname))
 async def process_wrong_surname_sent(message: Message):
-    await message.answer(text='То, что вы отправили не похоже на фамилию('
-                              'Пожалуйста, введите вашу фамилию!')
+    await message.answer(text=LEXICON_TEACHER['not_fill_surname'])
 
 
-# Случай, когда учитель уже зарегестрирован, но нажал на кнопку регистрации!
+# Случай, когда неправильно ввели номер телефона
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_phone))
+async def process_wrong_phone_sent(message: Message):
+    await message.answer(text=LEXICON_TEACHER['not_fill_phone'])
+
+
+# Случай, когда неправильно ввели банк/банки
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_bank))
+async def process_wrong_phone_sent(message: Message):
+    await message.answer(text=LEXICON_TEACHER['not_fill_bank'])
+
+
+# Случай, когда неправильно ввели банк/банки
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_bank))
+async def process_wrong_phone_sent(message: Message):
+    await message.answer(text=LEXICON_TEACHER['not_fill_bank'])
+
+
+# Случай, когда неправильно ввели пенальти
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_penalty))
+async def process_wrong_phone_sent(message: Message):
+    await message.answer(text=LEXICON_TEACHER['not_fill_penalty'])
+
+
+# Случай, когда учитель уже зарегистрирован, но нажал на кнопку регистрации!
 @router.callback_query(F.data == 'reg_teacher', IsTeacherInDatabase())
 async def process_not_start_registration(callback: CallbackQuery):
-    await callback.answer(text='Вы уже зарегестрированы!')
+    await callback.answer(text='Вы уже зарегистрированы!')
 
 
-# Случай, когда учитель не зарегестрирован, но нажал на кнопку авторизации!
+# Случай, когда учитель не зарегистрирован, но нажал на кнопку авторизации!
 @router.callback_query(F.data == 'auth_teacher', ~IsTeacherInDatabase())
 async def process_not_start_authorization(message: Message):
-    await message.answer(text='Вы еще не зарегестрированы!')
+    await message.answer(text='Вы еще не зарегистрированы!')
 
 
 ###################################### Зашли в профиль репетитора #######################################
 @router.callback_query(F.data == 'auth_teacher', IsTeacherInDatabase())
 async def process_start_authorization(callback: CallbackQuery):
-    await callback.message.edit_text(text='Вы успешно вошли в свой профиль!\n\n'
-                                          'В меню ниже выберите то, что хотите сделать)',
+    await callback.message.edit_text(text=LEXICON_TEACHER['main_menu_authorization'],
                                      reply_markup=create_authorization_kb())
 
 
-# Кнопка __расписание__  -> Выбираем день, с которым работаем!
+################################# Кнопка РЕДАКТИРОВАНИЕ РАСПИСАНИЯ #################################
 @router.callback_query(F.data == 'schedule_teacher')
 async def process_show_schedule(callback: CallbackQuery):
     next_seven_days_with_cur = give_list_with_days(datetime.now())
 
-    await callback.message.edit_text(text='Давайте поработаем с вашим расписанием\n'
-                                          'на 7 дней вперед!\n\n Чтобы заполнить, выбери день!',
-                                     reply_markup=show_next_seven_days_kb(*next_seven_days_with_cur, back='<<назад'))
+    await callback.message.edit_text(text=LEXICON_TEACHER['schedule_teacher_menu'],
+                                     reply_markup=show_next_seven_days_kb(next_seven_days_with_cur))
 
 
-# Выбираем кнопку __добавить__ или __удалить__ окошко!!
+# Выбираем кнопку __ДОБАВИТЬ__ или __УДАЛИТЬ__ !
 @router.callback_query(FindNextSevenDaysFromKeyboard())
 async def process_menu_add_remove(callback: CallbackQuery, state: FSMContext):
     await state.update_data(week_date=callback.data)
 
-    await callback.message.edit_text(text='Выберите что вы хотите сделать с раписанием!',
+    await callback.message.edit_text(text=LEXICON_TEACHER['schedule_changes_add_remove'],
                                      reply_markup=create_add_remove_gap_kb())
 
 
-########################## Случай, когда сработала кнока __добавить__! ######################################
+########################## Случай, когда сработала кнока __ДОБАВИТЬ__! ######################################
 @router.callback_query(F.data == 'add_gap_teacher', StateFilter(default_state))
 async def process_create_day_schedule(callback: CallbackQuery, state: FSMContext):
-    await callback.message.answer(text="Вам надо будет ввести время начала и конца вашей работы!\n"
-                                       "Вводи данные в формате ЧАСЫ:МИНУТЫ\n(например, 09:33; 12:00\n\n"
-                                       "Давайте начнем!\n\n"
-                                       "Введите время начала вашей работы!"
+    await callback.message.answer(text=LEXICON_TEACHER['add_time_start']
                                   )
-    # format_date = create_date_record(message.txt)
     await state.set_state(FSMRegistrationLessonWeek.fill_work_start)
 
     await callback.answer()
 
 
-# Начинаем заполнять форму для вставки времени в базу данных
-@router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_start), IsCorrectFormatInput(),
-                IsNoConflictWithStart())
+# Время старта введено, запрашиваем время окончания занятий
+@router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_start), IsCorrectFormatTime(),
+                IsInputTimeLongerThanNow(), IsNoConflictWithStart())
 async def process_time_start_sent(message: Message, state: FSMContext):
-    # hour, minute = list(map(int, message.text.split(':')))
-    await state.update_data(work_start=message.text)  # time(hour=hour, minute=minute))
+    await state.update_data(work_start=message.text)
 
     await state.set_state(FSMRegistrationLessonWeek.fill_work_end)
     await message.answer(text='Введите время, в которое вы заканчиваете работать!'
                               'Вводи данные в формате ЧАСЫ:МИНУТЫ (например, 09:33; 12:00')
 
 
-@router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_start), ~IsCorrectFormatInput())
-async def process_not_correct_format_start(message: Message):
-    await message.answer("Неправильно ввели время! Попробуйте еще раз!")
+# Формат времени ЧАСЫ:МИНУТЫ не соблюдаются для старта занятий
+@router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_start), ~IsCorrectFormatTime())
+async def process_not_correct_format_time(message: Message):
+    await message.answer(LEXICON_TEACHER['not_correct_format_time'])
+
+
+# Случай, когда вводимое время уже наступило!
+@router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_start), ~IsInputTimeLongerThanNow())
+async def process_time_has_passed(message: Message):
+    await message.answer(LEXICON_TEACHER['time_has_passed'])
 
 
 # Случай, когда стартовое время уже лежит в заданном диапазоне
@@ -216,7 +247,7 @@ async def process_start_in_range(message: Message, session: AsyncSession, state:
 
 
 # Случай успешного ввода времени
-@router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_end), IsCorrectFormatInput(),
+@router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_end), IsCorrectFormatTime(),
                 IsDifferenceThirtyMinutes(), IsNoEndBiggerStart(), IsNoConflictWithEnd())
 async def process_time_end_sent(message: Message, state: FSMContext, session: AsyncSession):
     await state.update_data(work_end=message.text)  # time(hour=hour, minute=minute))
@@ -240,7 +271,7 @@ async def process_time_end_sent(message: Message, state: FSMContext, session: As
 
 
 # Cлучай, когда формат 00:00 не соблюдается
-@router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_end), ~IsCorrectFormatInput())
+@router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_end), ~IsCorrectFormatTime())
 async def process_not_correct_format(message: Message):
     await message.answer(text="Неправильно ввели время! Попробуйте еще раз!\n"
                               "формат ЧАСЫ:МИНУТЫ",
@@ -354,11 +385,11 @@ async def process_edit_status_student(callback: CallbackQuery, session: AsyncSes
 
     # Получаем student_id по id учителя, дате занятия и началу занятия
     student_id = await give_student_id_by_teacher_id(session,
-                                                  callback.from_user.id,
-                                                  week_date,
-                                                  lesson_on,
-                                                  )
-    #print('ЙЙЙЙЙЙЙ', student_id)
+                                                     callback.from_user.id,
+                                                     week_date,
+                                                     lesson_on,
+                                                     )
+    # print('ЙЙЙЙЙЙЙ', student_id)
     # Меняем статус в базе данных
     await change_status_pay_student(session,
                                     student_id,
@@ -511,8 +542,13 @@ async def process_list_add_students(callback: CallbackQuery,
 @router.callback_query(ChangeStatusOfAddListCallbackFactory.filter())
 async def process_change_status_entry_student(callback: CallbackQuery, session: AsyncSession,
                                               callback_data: ChangeStatusOfAddListCallbackFactory):
-    teacher_id = callback_data.student_id
-    await change_status_entry_student(session, teacher_id)
+    student_id = callback_data.student_id
+    await change_status_entry_student(session, student_id)
+
+    if not (await give_status_entry_student(session,
+                                            student_id)):
+        await delete_all_lessons_student(session,
+                                         student_id)
 
     list_students = await give_all_students_by_teacher(session,
                                                        callback.from_user.id)
@@ -521,7 +557,7 @@ async def process_change_status_entry_student(callback: CallbackQuery, session: 
                                      reply_markup=create_list_add_students_kb(list_students))
 
 
-#############3 Кнопка редактировать (тут можно удалять) ################
+############## Кнопка редактировать (тут можно удалять) ################
 @router.callback_query(F.data == 'delete_student_by_teacher')
 async def process_show_delete_student_by_teacher(callback: CallbackQuery, session: AsyncSession):
     list_students = await give_all_students_by_teacher(session,

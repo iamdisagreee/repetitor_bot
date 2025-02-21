@@ -2,6 +2,8 @@ import asyncio
 import platform
 
 from aiogram import Bot, Dispatcher
+from aiogram.client.default import DefaultBotProperties
+from aiogram.enums import ParseMode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
 from sqlalchemy import text, select
@@ -34,7 +36,7 @@ async def main():
     config = load_config()
 
     engine = create_async_engine(url=config.tgbot.postgresql,
-                                 echo=True)
+                                 echo=False)
 
     storage = RedisStorage.from_url('redis://default:amazingroom123@176.109.110.166:6379/1')
 
@@ -49,14 +51,15 @@ async def main():
     #     await connection.run_sync(Base.metadata.drop_all)
     #     await connection.run_sync(Base.metadata.create_all)
 
-    bot = Bot(token=config.tgbot.token)
+    bot = Bot(token=config.tgbot.token,
+              default=DefaultBotProperties(parse_mode=ParseMode.HTML))
     dp = Dispatcher(storage=storage)
 
     session_maker = async_sessionmaker(engine)
 
     dp.include_router(everyone_handlers.router)
-    dp.include_router(student_handlers.router)
-    #dp.include_router(teacher_handlers.router)
+    #dp.include_router(student_handlers.router)
+    dp.include_router(teacher_handlers.router)
 
     dp.update.outer_middleware(DbSessionMiddleware(session_maker))
 

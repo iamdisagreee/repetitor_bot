@@ -9,20 +9,20 @@ from callback_factory.student import ChangeStatusOfAddListCallbackFactory, Delet
 from callback_factory.teacher import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
     DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory
-from database import AccessStudent
-from database.teacher_requirements import give_student_by_student_id, give_student_by_student_id
+from database.teacher_requirements import give_student_by_student_id
+from lexicon.lexicon_teacher import LEXICON_TEACHER
 from services.services import NUMERIC_DATE
 
 
 def create_entrance_kb():
     entrance_kb = InlineKeyboardMarkup(
         inline_keyboard=[
-                            [InlineKeyboardButton(text='Авторизация',
+                            [InlineKeyboardButton(text=LEXICON_TEACHER['authorization'],
                                                   callback_data='auth_teacher')],
-                            [InlineKeyboardButton(text='Регистрация',
+                            [InlineKeyboardButton(text=LEXICON_TEACHER['registration'],
                                                   callback_data='reg_teacher')]
                         ] + [
-                            [InlineKeyboardButton(text='<назад',
+                            [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
                                                   callback_data='start')]
                         ]
     )
@@ -33,7 +33,7 @@ def create_back_to_entrance_kb():
     back_to_entrance_kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(
-                text='Перейти в меню идентификации!',
+                text=LEXICON_TEACHER['go_menu_identification'],
                 callback_data='teacher_entrance')
             ]
         ]
@@ -45,17 +45,17 @@ def create_back_to_entrance_kb():
 def create_authorization_kb():
     authorization_kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text='Настройка расписания',
-                                  callback_data='schedule_teacher')],
-            [InlineKeyboardButton(text='Подтверждение оплаты',
-                                  callback_data='confirmation_pay')],
-            [InlineKeyboardButton(text='Мое расписание',
+            [InlineKeyboardButton(text=LEXICON_TEACHER['schedule_show'],
                                   callback_data='schedule_show')],
-            [InlineKeyboardButton(text='Настройки',
-                                  callback_data='settings_teacher')],
-            [InlineKeyboardButton(text='Управление учениками',
+            [InlineKeyboardButton(text=LEXICON_TEACHER['schedule_teacher'],
+                                  callback_data='schedule_teacher')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['confirmation_pay'],
+                                  callback_data='confirmation_pay')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['management_students'],
                                   callback_data='management_students')],
-            [InlineKeyboardButton(text='<назад',
+            [InlineKeyboardButton(text=LEXICON_TEACHER['settings_teacher'],
+                                  callback_data='settings_teacher')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
                                   callback_data='teacher_entrance')
              ]
         ]
@@ -63,30 +63,38 @@ def create_authorization_kb():
     return authorization_kb
 
 
-def show_next_seven_days_kb(*days, back):
+# Отображаем клавиатуру на следующие 7 дней + сегодняшний день
+def show_next_seven_days_kb(days):
     buttons = [
-                  [InlineKeyboardButton(text=f'{cur_date.strftime("%d.%m")} - '
-                                             f'{NUMERIC_DATE[date(year=cur_date.year,
-                                                                  month=cur_date.month,
-                                                                  day=cur_date.day).isoweekday()]}',
+                  [InlineKeyboardButton(text=LEXICON_TEACHER['next_seven_days_kb']
+                                        .format(cur_date.strftime("%d.%m"),
+                                                NUMERIC_DATE[
+                                                    date(
+                                                        year=cur_date.year,
+                                                        month=cur_date.month,
+                                                        day=cur_date.day
+                                                    ).isoweekday()
+                                                ]
+                                                ),
                                         callback_data=cur_date.strftime("%Y-%m-%d"))
                    ]
                   for cur_date in days
-              ] + [[InlineKeyboardButton(text=back,
+              ] + [[InlineKeyboardButton(text=LEXICON_TEACHER['back'],
                                          callback_data='auth_teacher')]]
     next_seven_days_with_cur_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
 
     return next_seven_days_with_cur_kb
 
 
+# Клавиатура кнопок __ДОБАВИТЬ__ и __УДАЛИТЬ__
 def create_add_remove_gap_kb():
     add_remove_gap_kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text='Добавить',
+            [InlineKeyboardButton(text=LEXICON_TEACHER['add_gap_teacher'],
                                   callback_data='add_gap_teacher')],
-            [InlineKeyboardButton(text='Удалить',
+            [InlineKeyboardButton(text=LEXICON_TEACHER['remove_gap_teacher'],
                                   callback_data='remove_gap_teacher')],
-            [InlineKeyboardButton(text='<назад',
+            [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
                                   callback_data='schedule_teacher')]
         ]
     )

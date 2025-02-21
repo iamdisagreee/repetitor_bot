@@ -1,10 +1,12 @@
+from uuid import UUID
+
 from aiogram.filters.callback_data import CallbackData
 
 from database import Student
 
 
 class DeleteDayCallbackFactory(CallbackData, prefix='delete'):
-    week_id: int
+    week_id: UUID
 
 
 class ShowDaysOfPayCallbackFactory(CallbackData, prefix='pay'):
