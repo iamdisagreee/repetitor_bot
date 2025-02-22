@@ -135,17 +135,25 @@ def create_all_records_week_day(weeks_day):
     return all_records_week_day_kb
 
 
+# f'{} - '
+#                                              f'{NUMERIC_DATE[date(year=cur_date.year,
+#                                                                   month=cur_date.month,
+#                                                                   day=cur_date.day).isoweekday()]}'
 def show_next_seven_days_pay_kb(*days):
     buttons = [
-                  [InlineKeyboardButton(text=f'{cur_date.strftime("%d.%m")} - '
-                                             f'{NUMERIC_DATE[date(year=cur_date.year,
-                                                                  month=cur_date.month,
-                                                                  day=cur_date.day).isoweekday()]}',
-                                        callback_data=ShowDaysOfPayCallbackFactory(
-                                            week_date=cur_date.strftime("%Y-%m-%d")
-                                        ).pack()
-                                        )
-                   ]
+                  [InlineKeyboardButton(text=LEXICON_TEACHER['next_seven_days_pay_kb'].format(
+                      cur_date.strftime("%d.%m"),
+                      NUMERIC_DATE[
+                          date(year=cur_date.year,
+                               month=cur_date.month,
+                               day=cur_date.day).isoweekday()
+                      ]
+                  ),
+                      callback_data=ShowDaysOfPayCallbackFactory(
+                          week_date=cur_date.strftime("%Y-%m-%d")
+                      ).pack()
+                  )
+                  ]
                   for cur_date in days
               ] + [[InlineKeyboardButton(text='<назад',
                                          callback_data='auth_teacher')]]

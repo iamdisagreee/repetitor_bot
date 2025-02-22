@@ -97,3 +97,5 @@ print(d)
 # print(now_delta < cur_delta - penalty_delta)
 a = [1,2,3]
 print(len(a))
+
+print(timedelta(hours=24) - timedelta(hours=24))

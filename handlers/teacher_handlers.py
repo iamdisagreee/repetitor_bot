@@ -6,23 +6,27 @@ from aiogram.filters import CommandStart, StateFilter, Command
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.fsm.state import StatesGroup, State, default_state
+from sqlalchemy import delete
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
 from callback_factory.student import ChangeStatusOfAddListCallbackFactory, DeleteStudentToStudyCallbackFactory
 from callback_factory.teacher import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
     DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory
+from database import Student, LessonDay
+from database.models import Penalty
 from database.student_requirements import delete_student_profile
 from database.teacher_requirements import command_add_teacher, command_add_lesson_week, give_installed_lessons_week, \
     delete_week_day, give_all_lessons_day_by_week_day, change_status_pay_student, \
     give_information_of_one_lesson, delete_lesson, delete_teacher_profile, give_student_id_by_teacher_id, \
     give_penalty_by_teacher_id, give_all_students_by_teacher, change_status_entry_student, add_student_id_in_database, \
     delete_student_id_in_database, give_all_students_by_teacher_penalties, delete_all_lessons_student, \
-    give_status_entry_student
+    give_status_entry_student, give_student_by_teacher_id
 from filters.teacher_filters import IsTeacherInDatabase, \
     FindNextSevenDaysFromKeyboard, IsCorrectFormatTime, IsNoEndBiggerStart, IsDifferenceThirtyMinutes, \
     IsNoConflictWithStart, IsNoConflictWithEnd, IsRemoveNameRight, IsLessonWeekInDatabaseState, IsSomethingToConfirm, \
-    IsPenaltyNow, IsPhoneCorrectInput, IsBankCorrectInput, IsPenaltyCorrectInput, IsInputTimeLongerThanNow
+    IsPenaltyNow, IsPhoneCorrectInput, IsBankCorrectInput, IsPenaltyCorrectInput, IsInputTimeLongerThanNow, \
+    IsNewDayNotNear, IsCorrectTimeInputWithPenalty
 from keyboards.everyone_kb import create_start_kb
 from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb, create_authorization_kb, \
     show_next_seven_days_kb, create_back_to_profile_kb, create_add_remove_gap_kb, create_all_records_week_day, \
@@ -32,7 +36,7 @@ from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb,
     create_back_to_management_students_kb, create_list_delete_students_kb, show_list_of_debtors_kb
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from services.services import give_list_with_days, give_time_format_fsm, give_date_format_fsm, \
-    give_list_registrations_str, show_intermediate_information_lesson_day_status, give_result_info
+    give_list_registrations_str, show_intermediate_information_lesson_day_status, give_result_info, COUNT_BAN
 
 router = Router()
 
@@ -207,27 +211,54 @@ async def process_create_day_schedule(callback: CallbackQuery, state: FSMContext
     await callback.answer()
 
 
-# Время старта введено, запрашиваем время окончания занятий
+# Ловим время __Старта__ , запрашиваем время __Окончания__ занятий
 @router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_start), IsCorrectFormatTime(),
-                IsInputTimeLongerThanNow(), IsNoConflictWithStart())
+                IsNewDayNotNear(), IsInputTimeLongerThanNow(),  # IsCorrectTimeInputWithPenalty(),
+                IsNoConflictWithStart())
 async def process_time_start_sent(message: Message, state: FSMContext):
     await state.update_data(work_start=message.text)
 
     await state.set_state(FSMRegistrationLessonWeek.fill_work_end)
-    await message.answer(text='Введите время, в которое вы заканчиваете работать!'
-                              'Вводи данные в формате ЧАСЫ:МИНУТЫ (например, 09:33; 12:00')
+    await message.answer(text=LEXICON_TEACHER['add_time_end'])
 
 
-# Формат времени ЧАСЫ:МИНУТЫ не соблюдаются для старта занятий
+###### ФИЛЬТРЫ ДЛЯ __СТАРТА__
+# Формат времени ЧАСЫ:МИНУТЫ не соблюдаются для старта
 @router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_start), ~IsCorrectFormatTime())
 async def process_not_correct_format_time(message: Message):
     await message.answer(LEXICON_TEACHER['not_correct_format_time'])
+
+
+# Случай, когда введенно время >= 23:30
+@router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_start), ~IsNewDayNotNear())
+async def process_new_day_not_near(message: Message):
+    await message.answer(LEXICON_TEACHER['new_day_not_near'])
 
 
 # Случай, когда вводимое время уже наступило!
 @router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_start), ~IsInputTimeLongerThanNow())
 async def process_time_has_passed(message: Message):
     await message.answer(LEXICON_TEACHER['time_has_passed'])
+
+
+# Проверка, что время старта - время пенальти > текущего времени не сработала
+# @router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_start), ~IsCorrectTimeInputWithPenalty())
+# async def process_new_day_not_near(message: Message, session: AsyncSession,
+#                                    state: FSMContext):
+#     week_date_str = (await state.get_data())['week_date']
+#     week_date = give_date_format_fsm(week_date_str)
+#     time_put = give_time_format_fsm(message.text)
+#     penalty = await give_penalty_by_teacher_id(session,
+#                                                message.from_user.id)
+#     dt_put = datetime(year=week_date.year,
+#                       month=week_date.month,
+#                       day=week_date.day,
+#                       hour=time_put.hour,
+#                       minute=time_put.minute)
+#     await message.answer(LEXICON_TEACHER['conflict_with_penalty']
+#                          .format((dt_put - timedelta(hours=penalty)).strftime("%H:%M"),
+#                                  time_put.strftime("%H:%M"))
+#                          )
 
 
 # Случай, когда стартовое время уже лежит в заданном диапазоне
@@ -241,16 +272,18 @@ async def process_start_in_range(message: Message, session: AsyncSession, state:
                                                  week_date)
 
     res_time_str = give_list_registrations_str(res_time)
-    await message.answer('Стартовое время конфликтует с существующим!\n\n'
-                         'Существующие записи:\n' + res_time_str +
-                         '\n\nПопробуйте еще раз!')
+    await message.answer(text=LEXICON_TEACHER['start_conflict_with_existing']
+                         .format(res_time_str, message.text))
 
 
-# Случай успешного ввода времени
-@router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_end), IsCorrectFormatTime(),
-                IsDifferenceThirtyMinutes(), IsNoEndBiggerStart(), IsNoConflictWithEnd())
+###### КОНЕЦ ФИЛЬТРОВ  ДЛЯ __СТАРТА__
+
+# Случай успешного ввода времени (поймали апдейт конца занятий)
+@router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_end), IsNoEndBiggerStart(),
+                IsCorrectFormatTime(),
+                IsDifferenceThirtyMinutes(), IsNoConflictWithEnd())
 async def process_time_end_sent(message: Message, state: FSMContext, session: AsyncSession):
-    await state.update_data(work_end=message.text)  # time(hour=hour, minute=minute))
+    await state.update_data(work_end=message.text)
     lesson_day_form = await state.get_data()
 
     time_to_repeat = lesson_day_form['week_date']
@@ -265,50 +298,52 @@ async def process_time_end_sent(message: Message, state: FSMContext, session: As
 
     await state.clear()
 
-    await message.answer(text='Ваша анкета успешно сохранена!',
+    await message.answer(text=LEXICON_TEACHER['add_time_start_right'],
                          reply_markup=create_back_to_profile_kb(time_to_repeat)
                          )
 
 
-# Cлучай, когда формат 00:00 не соблюдается
+##############ФИЛЬТРЫ ДЛЯ ОКОНЧАНИЯ ЗАНЯТИЙ
+
+# Формат времени ЧАСЫ:МИНУТЫ не соблюдаются для окончания
 @router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_end), ~IsCorrectFormatTime())
 async def process_not_correct_format(message: Message):
-    await message.answer(text="Неправильно ввели время! Попробуйте еще раз!\n"
-                              "формат ЧАСЫ:МИНУТЫ",
+    await message.answer(text=LEXICON_TEACHER['not_correct_format_time']
                          )
 
 
 # Случай, когда время работы меньше 30 минут
 @router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_end), ~IsDifferenceThirtyMinutes())
-async def process_not_thirty_difference(message: Message):
-    await message.answer("Время работы меньше 30 минут!\nВведите заново конец занятия!"
-                         "Время старта заняий: ...")
+async def process_not_thirty_difference(message: Message, state: FSMContext):
+    work_start = (await state.get_data())['work_start']
+    await message.answer(text=LEXICON_TEACHER['not_difference_thirty_min'].format(work_start))
 
 
 # Случай, если время конца работы начинается раньше времени старта работы
 @router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_end), ~IsNoEndBiggerStart())
-async def process_not_thirty_difference(message: Message):
-    await message.answer("Время конца работы меньше времени старта занятий!\nВведите заново!"
-                         "Время старта занятий: ...")
+async def process_not_thirty_difference(message: Message, state: FSMContext):
+    work_start = (await state.get_data())['work_start']
+    await message.answer(LEXICON_TEACHER['end_bigger_start'].format(work_start))
 
 
 # Случай, когда время конца занятий уже лежит в заданном диапазоне
 @router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_end), ~IsNoConflictWithEnd())
 async def process_start_in_range(message: Message, session: AsyncSession, state: FSMContext):
-    week_date_str = (await state.get_data())['week_date']
-    week_date = give_date_format_fsm(week_date_str)
+    data_info = await state.get_data()
+    week_date = give_date_format_fsm(data_info['week_date'])
 
     res_time = await give_installed_lessons_week(session,
                                                  message.from_user.id,
                                                  week_date)
     res_time_str = give_list_registrations_str(res_time)
-    await message.answer('Конечное время конфликтует с существующим!\n\n'
-                         'Существующие записи:\n' + res_time_str +
-                         '\n\nПопробуй еще раз!')
+    await message.answer(LEXICON_TEACHER['end_conflict_with_existing']
+                         .format(res_time_str, data_info['work_start']))
 
+
+###########КОНЕЦ ФИЛЬТРОВ ДЛЯ ОКОНЧАНИЯ ЗАНЯТИЙ
 
 ########################## Случай, когда сработала кнока __удалить__! ######################################
-@router.callback_query(F.data == 'remove_gap_teacher', IsLessonWeekInDatabaseState(), StateFilter(default_state))
+@router.callback_query(F.data == 'remove_gap_teacher', IsLessonWeekInDatabaseState())
 async def process_create_day_schedule_delete(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
     week_date_str = (await state.get_data())['week_date']
     week_date = give_date_format_fsm(week_date_str)
@@ -317,7 +352,7 @@ async def process_create_day_schedule_delete(callback: CallbackQuery, session: A
                                                    callback.from_user.id,
                                                    week_date)
 
-    await callback.message.edit_text(text='Чтобы удалить, нажми на желаемую кнопку!',
+    await callback.message.edit_text(text=LEXICON_TEACHER['delete_time_start'],
                                      reply_markup=create_all_records_week_day(weeks_days))
 
 
@@ -336,14 +371,14 @@ async def process_delete_week_day(callback: CallbackQuery, session: AsyncSession
                                                    callback.from_user.id,
                                                    week_date)
 
-    await callback.message.edit_text(text='Чтобы удалить, нажми на желаемую кнопку!',
+    await callback.message.edit_text(text=LEXICON_TEACHER['delete_time_start'],
                                      reply_markup=create_all_records_week_day(weeks_days))
 
 
 # Случай, когда нечего удалять из созданных промежутков!
 @router.callback_query(F.data == 'remove_gap_teacher', ~IsLessonWeekInDatabaseState())
 async def process_create_day_schedule_nothing(callback: CallbackQuery):
-    await callback.answer(text='Еще не установлено расписание!')
+    await callback.answer(text=LEXICON_TEACHER['nothing_delete_teacher_time'])
 
 
 ########################### Кнопка __Подтверждение оплаты__ ########################
@@ -351,7 +386,7 @@ async def process_create_day_schedule_nothing(callback: CallbackQuery):
 @router.callback_query(F.data == 'confirmation_pay')
 async def process_confirmation_pay(callback: CallbackQuery):
     next_seven_days_with_cur = give_list_with_days(datetime.now())
-    await callback.message.edit_text(text='Выбери день для просмотра состояния оплаты:',
+    await callback.message.edit_text(text=LEXICON_TEACHER['confirmation_pay_menu'],
                                      reply_markup=show_next_seven_days_pay_kb(*next_seven_days_with_cur))
 
 
@@ -367,15 +402,18 @@ async def process_show_status_student(callback: CallbackQuery, session: AsyncSes
                                                                         callback.from_user.id,
                                                                         week_date)
     intermediate_buttons = show_intermediate_information_lesson_day_status(list_lessons_not_formatted)
-    await callback.message.edit_text(text='Нажмите, чтобы поменять статус:',
+    await callback.message.edit_text(text=LEXICON_TEACHER['change_status_pay_menu'],
                                      reply_markup=await show_status_lesson_day_kb(intermediate_buttons,
                                                                                   session,
                                                                                   week_date_str))
 
 
 # Ловим нажатие на кнопку и меняем статус оплаты: ❌ -> ✅ ; ✅ -> ❌
-# Второй фильтр всегда __True__, но он проверяет, будет ли штраф!
-@router.callback_query(EditStatusPayCallbackFactory.filter(), IsPenaltyNow())
+# Проверяем на условие пенальти:
+# ❌ -> ✅ - проверяем на пенальти/баним (если указано время)
+# ✅ -> ❌ - не проверяем на пенальти (случайные клики)
+# НАДО ДОБАВИТЬ МЕНЮ
+@router.callback_query(EditStatusPayCallbackFactory.filter())
 async def process_edit_status_student(callback: CallbackQuery, session: AsyncSession,
                                       callback_data: EditStatusPayCallbackFactory):
     week_date_str = callback_data.week_date
@@ -389,15 +427,52 @@ async def process_edit_status_student(callback: CallbackQuery, session: AsyncSes
                                                      week_date,
                                                      lesson_on,
                                                      )
-    # print('ЙЙЙЙЙЙЙ', student_id)
-    # Меняем статус в базе данных
-    await change_status_pay_student(session,
-                                    student_id,
-                                    week_date,
-                                    lesson_on,
-                                    lesson_off)
+    # Меняем статус в базе данных и возвращаем статус
+    status_student = await change_status_pay_student(session,
+                                                     student_id,
+                                                     week_date,
+                                                     lesson_on,
+                                                     lesson_off)
+    #print(status_student)
+    # Проверка: наступило ли время для пенальти или нет.
+    # Если наступило, то добавляем в таблицу penalties.
+    # Если количество пенальти == 2, то баним
+    teacher_penalty = await give_penalty_by_teacher_id(session,
+                                                       callback.from_user.id)
 
-    # Поменяли status, теперь выводим нашу клавиатуру снова
+    # проверяем, что значение пенальти != 0 и ❌ -> ✅
+    if teacher_penalty and status_student:
+        time_now = time(hour=datetime.now().hour, minute=datetime.now().minute)
+        student = await give_student_by_teacher_id(session,
+                                                   callback.from_user.id,
+                                                   week_date,
+                                                   lesson_on)
+        #print(status_student)
+        # Условие, что пенальти наступило
+        if timedelta(hours=time_now.hour, minutes=time_now.minute) \
+                > timedelta(hours=lesson_on.hour - teacher_penalty,
+                            minutes=lesson_on.minute):
+            #print(status_student)
+            if len(student.penalties) >= 1:
+                #await change_status_entry_student(session, student.student_id)
+                student.access.status = False
+                to_delete_penalty = delete(Penalty).where(Student.student_id == student.student_id)
+                to_delete_lesson_day = delete(LessonDay).where(Student.student_id == student.student_id)
+                await session.execute(to_delete_penalty)
+                await session.execute(to_delete_lesson_day)
+                # Выводим данные о человеке с баном!
+                await callback.answer(f'{student.name} {student.surname} забанен!')
+
+            else:
+                penalty = Penalty(student_id=student.student_id,
+                                  week_date=week_date,
+                                  lesson_on=lesson_on,
+                                  lesson_off=lesson_off)
+                session.add(penalty)
+                await callback.answer(f'{student.name} {student.surname} получил пенальти!')
+            await session.commit()
+
+    # Выводим нашу клавиатуру снова
 
     list_lessons_not_formatted = await give_all_lessons_day_by_week_day(session,
                                                                         callback.from_user.id,
@@ -405,7 +480,7 @@ async def process_edit_status_student(callback: CallbackQuery, session: AsyncSes
 
     intermediate_buttons = show_intermediate_information_lesson_day_status(list_lessons_not_formatted)
 
-    await callback.message.edit_text(text='Нажмите, чтобы поменять статус:',
+    await callback.message.edit_text(text=LEXICON_TEACHER['change_status_pay_menu'],
                                      reply_markup=await show_status_lesson_day_kb(intermediate_buttons,
                                                                                   session,
                                                                                   week_date_str))
@@ -414,7 +489,7 @@ async def process_edit_status_student(callback: CallbackQuery, session: AsyncSes
 # Случай, когда никто еще не выбрал занятие! И статус оплаты просто не появился!
 @router.callback_query(ShowDaysOfPayCallbackFactory.filter(), ~IsSomethingToConfirm())
 async def process_not_show_status_student(callback: CallbackQuery):
-    await callback.answer("В данный момент никто не выбрал занятия!(")
+    await callback.answer(LEXICON_TEACHER['nobody_choose_lessons'])
 
 
 ########################################## кнопка МОЕ РАСПИСАНИЕ ######################################

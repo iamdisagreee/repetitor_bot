@@ -52,7 +52,9 @@ async def give_installed_lessons_week(session: AsyncSession,
         .where(
             and_(
                 LessonWeek.teacher_id == teacher_id,
-                LessonWeek.week_date == week_date
+                LessonWeek.week_date == week_date,
+                LessonWeek.work_end > time(hour=datetime.now().hour,
+                                           minute=datetime.now().minute)
             )
         )
         .order_by(LessonWeek.work_start)
@@ -123,22 +125,37 @@ async def change_status_pay_student(session: AsyncSession,
         )
         .order_by(LessonDay.lesson_start)
     )
-
+    status = False
     list_lessons = {}
     for lesson_day in lesson_days.scalars():
-        # Проверяем случай, когда занятие оплачено, но добавился новый промежуток
-        list_lessons[lesson_day.status] = lesson_day
-    if sum(list_lessons.keys()) != len(list_lessons.keys()) and sum(list_lessons.keys()) > 0:
-        for lesson_day_u in list_lessons.values():
+        list_lessons[lesson_day] = lesson_day.status
+    if sum(list_lessons.values()) != len(list_lessons) and sum(list_lessons.values()) > 0:
+        for lesson_day_u in list_lessons.keys():
             lesson_day_u.status = False
     else:
-        for lesson_day_u in list_lessons.values():
-            if lesson_day_u.status:
-                lesson_day_u.status = False
-            else:
-                lesson_day_u.status = True
+        for lesson_day_u in list_lessons.keys():
+            if status or not lesson_day_u.status:
+                status = True
+            lesson_day_u.status = not lesson_day_u.status
+        # for lesson_day in lesson_days.scalars():
+    #     # Проверяем случай, когда занятие оплачено, но добавился новый промежуток
+    #     list_lessons[lesson_day.status] = lesson_day
+    #     print(list_lessons)
+    # if sum(list_lessons.keys()) != len(list_lessons.keys()) and sum(list_lessons.keys()) > 0:
+    #     for lesson_day_u in list_lessons.values():
+    #         lesson_day_u.status = False
+    # else:
+    #     for lesson_day_u in list_lessons.values():
+    #         if lesson_day_u.status:
+    #             lesson_day_u.status = False
+    #         else:
+    #             lesson_day_u.status = True
+    #             if not status:
+    #                 status = True
 
     await session.commit()
+
+    return status
 
 
 async def give_information_of_one_lesson(session: AsyncSession,

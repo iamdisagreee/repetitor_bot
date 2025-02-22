@@ -71,8 +71,32 @@ class IsLessonWeekInDatabaseCallback(BaseFilter):
 class IsCorrectFormatTime(BaseFilter):
     async def __call__(self, message: Message):
         return re.fullmatch(r'^0[0-9]:[0-5][0-9]|^1[0-9]:[0-5][0-9]|'
-                            r'^2[0-4]:[0-5][0-9]', message.text)
+                            r'^2[0-3]:[0-5][0-9]', message.text)
         # re.fullmatch(r'\d\d:\d\d', message.text) and \
+
+
+# Проверка, что время старта <23:30
+class IsNewDayNotNear(BaseFilter):
+    async def __call__(self, message: Message):
+        give_time_format_fsm(message.text)
+        return give_time_format_fsm(message.text) < time(hour=23, minute=30)
+
+
+# Проверка, что время старта - время __пенальти__ > текущего времени
+class IsCorrectTimeInputWithPenalty(BaseFilter):
+    async def __call__(self, message: Message, state: FSMContext,
+                       session: AsyncSession):
+        week_date_str = (await state.get_data())['week_date']
+        week_date = give_date_format_fsm(week_date_str)
+        time_put = give_time_format_fsm(message.text)
+        penalty = await give_penalty_by_teacher_id(session,
+                                                   message.from_user.id)
+        dt_put = datetime(year=week_date.year,
+                          month=week_date.month,
+                          day=week_date.day,
+                          hour=time_put.hour,
+                          minute=time_put.minute)
+        return datetime.now() + timedelta(hours=penalty) < dt_put
 
 
 # Проверяем, что вводимое время больше текущего (по дню сравниванием также)
@@ -88,7 +112,7 @@ class IsInputTimeLongerThanNow(BaseFilter):
                                           minute=time_add.minute)
 
 
-# Фильтр проверяет, что не пересекается введенное время с уже добавленным
+# Фильтр проверяет, что время старта не конфликтует с уже добавленным
 class IsNoConflictWithStart(BaseFilter):
     async def __call__(self, message: Message, session: AsyncSession, state: FSMContext):
         time_start = give_time_format_fsm(message.text)
@@ -125,6 +149,7 @@ class IsDifferenceThirtyMinutes(BaseFilter):
         return delta_end - delta_start >= timedelta(minutes=30)
 
 
+# Фильтр проверяет, что время старта < время_окончания
 class IsNoEndBiggerStart(BaseFilter):
     async def __call__(self, message: Message, state: FSMContext):
         lesson_day_form = await state.get_data()
@@ -136,6 +161,7 @@ class IsNoEndBiggerStart(BaseFilter):
                 timedelta(hours=work_start.hour, minutes=work_start.minute))
 
 
+# Проверка, что время окончания не лежит в уже существующем промежутке
 class IsNoConflictWithEnd(BaseFilter):
     async def __call__(self, message: Message, session: AsyncSession, state: FSMContext):
         time_end = give_time_format_fsm(message.text)
