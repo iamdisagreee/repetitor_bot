@@ -8,17 +8,28 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, delete
 
 from callback_factory.teacher import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory
-from database import Teacher, LessonWeek, LessonDay, Student
+from database import Teacher, LessonWeek, LessonDay, Student, AccessTeacher
 from database.models import Penalty
 from database.teacher_requirements import give_installed_lessons_week, give_penalty_by_teacher_id, \
     give_student_by_teacher_id
 from services.services import give_list_with_days, give_date_format_callback, give_date_format_fsm, give_time_format_fsm
 
 
+# Ученик - ничего не происходит
+# Преподаватель - открываем
+class TeacherStartFilter(BaseFilter):
+    async def __call__(self, callback: CallbackQuery,
+                       available_teachers):
+        result = callback.from_user.id in available_teachers
+        if not result:
+            await callback.answer('Нет доступа!')
+        return result
+
+
 # Проверяем, находится учитель в базе данных или нет!
 class IsTeacherInDatabase(BaseFilter):
-    async def __call__(self, message: Message, session: AsyncSession):
-        stmt = select(Teacher).where(Teacher.teacher_id == message.from_user.id)
+    async def __call__(self, callback: Message, session: AsyncSession):
+        stmt = select(Teacher).where(Teacher.teacher_id == callback.from_user.id)
         result = await session.execute(stmt)
         return result.scalar()
 

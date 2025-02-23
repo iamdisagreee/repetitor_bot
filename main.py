@@ -58,11 +58,10 @@ async def main():
     session_maker = async_sessionmaker(engine)
 
     dp.include_router(everyone_handlers.router)
-    #dp.include_router(student_handlers.router)
+    dp.include_router(student_handlers.router)
     dp.include_router(teacher_handlers.router)
 
     dp.update.outer_middleware(DbSessionMiddleware(session_maker))
-
     # Удаление по расписанию (раз в день)!
     # scheduler = AsyncIOScheduler()
     # scheduler.add_job(delete_old_records, 'interval', days=3, args=(session_maker,))  # Runs daily
@@ -76,3 +75,4 @@ if __name__ == '__main__':
     if platform.system() == 'Windows':
         asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
     asyncio.run(main())
+

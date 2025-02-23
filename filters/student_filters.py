@@ -20,6 +20,17 @@ from services.services import give_list_with_days, give_date_format_fsm, create_
     create_delete_time_student, give_time_format_fsm
 
 
+# Преподаватель - нет доступа
+# Ученик - открываем
+class StudentStartFilter(BaseFilter):
+    async def __call__(self, callback: CallbackQuery,
+                       available_students):
+        result = callback.from_user.id in available_students
+        if not result:
+            await callback.answer()
+        return result
+
+
 class IsStudentInDatabase(BaseFilter):
     async def __call__(self, message: Message, session: AsyncSession):
         stmt = select(Student).where(Student.student_id == message.from_user.id)

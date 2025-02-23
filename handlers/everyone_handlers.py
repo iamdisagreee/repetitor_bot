@@ -11,9 +11,11 @@ router = Router()
 
 
 @router.message(CommandStart())
-async def process_start_using_bot(message: Message, state: FSMContext):
+async def process_start_using_bot(message: Message, state: FSMContext,
+                                  ):
     await message.answer(text="Здравствуйте, выберите роль!",
                          reply_markup=create_start_kb())
+
     await state.clear()
 
 

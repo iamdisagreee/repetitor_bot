@@ -2,7 +2,7 @@ from datetime import date, datetime, timedelta, time
 from pprint import pprint
 
 from aiogram import Router, F, Bot
-from aiogram.filters import CommandStart, StateFilter, Command
+from aiogram.filters import CommandStart, StateFilter, Command, BaseFilter
 from aiogram.filters.callback_data import CallbackData
 from aiogram.fsm import state
 from aiogram.fsm.context import FSMContext
@@ -20,7 +20,8 @@ from database.student_requirements import command_get_all_teachers, command_add_
     give_information_of_lesson, delete_student_profile, give_students_penalty
 from filters.student_filters import IsStudentInDatabase, IsInputFieldAlpha, IsInputFieldDigit, \
     FindNextSevenDaysFromKeyboard, IsMoveRightAddMenu, IsMoveLeftMenu, IsTeacherDidSlots, IsStudentChooseSlots, \
-    IsMoveRightRemoveMenu, IsLessonsInChoseDay, IsTimeNotExpired, IsFreeSlots, IsTeacherDidSystemPenalties, IsStudentHasPenalties
+    IsMoveRightRemoveMenu, IsLessonsInChoseDay, IsTimeNotExpired, IsFreeSlots, IsTeacherDidSystemPenalties, \
+    IsStudentHasPenalties, StudentStartFilter
 from keyboards.everyone_kb import create_start_kb
 from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, create_level_choice_kb, \
     create_back_to_entrance_kb, create_authorization_kb, show_next_seven_days_settings_kb, create_menu_add_remove_kb, \
@@ -30,7 +31,13 @@ from services.services import give_list_with_days, create_choose_time_student, g
     give_time_format_fsm, create_delete_time_student, show_all_lessons_for_day, give_result_status_timeinterval, \
     give_result_info
 
+# Преподаватель - нет доступа
+# Ученик - открываем
 router = Router()
+router.callback_query.filter(StudentStartFilter())
+
+
+# router.callback_query.outer_middleware(IsAccessUserMiddleware())
 
 
 class FSMRegistrationStudentForm(StatesGroup):
@@ -168,13 +175,13 @@ async def process_price_sent(message: Message, session: AsyncSession, state: FSM
                          reply_markup=create_back_to_entrance_kb())
 
 
-# Случай, когда ученик находится в бд, но хочет зарегестрироваться
+# Случай, когда ученик находится в бд, но хочет зарегистрироваться
 @router.callback_query(F.data == 'reg_student', IsStudentInDatabase())
 async def process_not_start_registration(callback: CallbackQuery):
     await callback.answer("Вы уже зарегестрированы!")
 
 
-# Случай, когда еще не зарегестрировался, но хочет зайти авторизоваться
+# Случай, когда еще не зарегистрировался, но хочет зайти авторизоваться
 @router.callback_query(F.data == 'auth_student', ~IsStudentInDatabase())
 async def process_not_start_authentication(callback: CallbackQuery):
     await callback.answer("Вы еще не зарегестрированы!")

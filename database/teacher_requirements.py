@@ -129,6 +129,7 @@ async def change_status_pay_student(session: AsyncSession,
     list_lessons = {}
     for lesson_day in lesson_days.scalars():
         list_lessons[lesson_day] = lesson_day.status
+    print(list_lessons)
     if sum(list_lessons.values()) != len(list_lessons) and sum(list_lessons.values()) > 0:
         for lesson_day_u in list_lessons.keys():
             lesson_day_u.status = False
@@ -137,22 +138,6 @@ async def change_status_pay_student(session: AsyncSession,
             if status or not lesson_day_u.status:
                 status = True
             lesson_day_u.status = not lesson_day_u.status
-        # for lesson_day in lesson_days.scalars():
-    #     # Проверяем случай, когда занятие оплачено, но добавился новый промежуток
-    #     list_lessons[lesson_day.status] = lesson_day
-    #     print(list_lessons)
-    # if sum(list_lessons.keys()) != len(list_lessons.keys()) and sum(list_lessons.keys()) > 0:
-    #     for lesson_day_u in list_lessons.values():
-    #         lesson_day_u.status = False
-    # else:
-    #     for lesson_day_u in list_lessons.values():
-    #         if lesson_day_u.status:
-    #             lesson_day_u.status = False
-    #         else:
-    #             lesson_day_u.status = True
-    #             if not status:
-    #                 status = True
-
     await session.commit()
 
     return status
