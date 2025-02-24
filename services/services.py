@@ -102,7 +102,7 @@ def create_delete_time_student(lessons_busy):
             page_slots += 1
         slots[page_slots].append(lesson)
         record += 1
-    pprint(slots, indent=4)
+    #pprint(slots, indent=4)
     return slots
 
 
@@ -150,16 +150,20 @@ def give_result_info(result_status):
 def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
     # installed_lessons_week):
     cur_buttons = []
+    empty_lessons = []
     last_one = {'lesson_on': -1,
                 'lesson_off': -1,
                 'student_id': -1,
                 'list_status': []}
-    start, end = 0, 0
+    # start, end = 0, 0
     # Случай, когда ученик не выбрал уроков вообще
     for interval in list_lessons_not_formatted:
-        if not start:
-            start = interval.work_start
-        end = interval.work_end
+        if not interval.lessons:
+            cur_empty = {'lesson_on': interval.work_start,
+                         'lesson_off': interval.work_end,
+                         'student_id': -1,
+                         'list_status': [-1]}
+            empty_lessons.append(cur_empty)
         if interval.lessons:
             lessons_sort = sorted(interval.lessons, key=lambda gap: gap.lesson_start)
             if lessons_sort[0].lesson_start == last_one['lesson_off'] and \
@@ -223,13 +227,24 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
                 )
             last_one = interval_result
 
+    # Ни одного занятого места
     if not cur_buttons:
+        start = empty_lessons[0]['lesson_on']
+        end = empty_lessons[0]['lesson_off']
+        for lesson in empty_lessons[1:]:
+            if lesson['lesson_on'] == end:
+                end = lesson['lesson_off']
+            else:
+                cur_buttons.append(
+                    {'lesson_on': start,
+                     'lesson_off': end,
+                     'student_id': -1,
+                     'list_status': [-1]})
+                start = lesson['lesson_on']
+                end = lesson['lesson_off']
         cur_buttons.append(
-            {
-                'lesson_on': start,
-                'lesson_off': end,
-                'student_id': None,
-                'list_status': [-1]
-            }
-        )
+            {'lesson_on': start,
+             'lesson_off': end,
+             'student_id': -1,
+             'list_status': [-1]})
     return cur_buttons

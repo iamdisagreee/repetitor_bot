@@ -48,6 +48,15 @@ class IsInputFieldDigit(BaseFilter):
         return message.text.isdigit()
 
 
+class IsRightClassCourse(BaseFilter):
+    async def __call__(self, message: Message):
+        return message.text.isdigit() and 1 <= int(message.text) <= 11
+
+
+class IsRightPrice(BaseFilter):
+    async def __call__(self, message):
+        return message.text.isdigit() and int(message.text) >= 0
+
 class FindNextSevenDaysFromKeyboard(BaseFilter):
     async def __call__(self, callback: CallbackQuery):
         my_days = [

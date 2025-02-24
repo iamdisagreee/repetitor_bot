@@ -53,8 +53,8 @@ async def give_installed_lessons_week(session: AsyncSession,
             and_(
                 LessonWeek.teacher_id == teacher_id,
                 LessonWeek.week_date == week_date,
-                LessonWeek.work_end > time(hour=datetime.now().hour,
-                                           minute=datetime.now().minute)
+                # LessonWeek.work_end > time(hour=datetime.now().hour,
+                #                            minute=datetime.now().minute)
             )
         )
         .order_by(LessonWeek.work_start)
@@ -110,13 +110,6 @@ async def give_all_lessons_day_by_week_day(session: AsyncSession,
 
     return result.scalars()
 
-    # for week_lesson in result.scalars():
-    #     sorted_lessons = sorted(week_lesson.lessons, key=lambda x: x.lesson_start)
-    #     print('FFFF', week_lesson.week_date, week_lesson.work_start, week_lesson.work_end)
-    #     for lesson in sorted_lessons:
-    #         print(lesson.lesson_start, lesson.lesson_finished)
-    # exit()
-
 
 async def give_student_by_student_id(session: AsyncSession,
                                      student_id: int):
@@ -147,7 +140,7 @@ async def change_status_pay_student(session: AsyncSession,
     list_lessons = {}
     for lesson_day in lesson_days.scalars():
         list_lessons[lesson_day] = lesson_day.status
-    print(list_lessons)
+
     if sum(list_lessons.values()) != len(list_lessons) and sum(list_lessons.values()) > 0:
         for lesson_day_u in list_lessons.keys():
             lesson_day_u.status = False
@@ -213,6 +206,16 @@ async def delete_teacher_profile(session: AsyncSession,
 
     await session.delete(profile.scalar())
     await session.commit()
+
+
+async def give_teacher_profile_by_teacher_id(session: AsyncSession,
+                                             teacher_id):
+    profile = await session.execute(
+        select(Teacher)
+        .where(Teacher.teacher_id == teacher_id)
+    )
+
+    return profile.scalar()
 
 
 async def give_student_id_by_teacher_id(session: AsyncSession,
@@ -308,8 +311,14 @@ async def give_all_students_by_teacher_penalties(session: AsyncSession,
                                                  teacher_id: int):
     result = await session.execute(
         select(Student)
-        .where(Student.teacher_id == teacher_id)
+        .where(
+            and_(
+                Student.teacher_id == teacher_id,
+                Student.penalties != None
+            )
+        )
         .options(selectinload(Student.penalties))
+        .order_by(Student.surname)
     )
 
     return result.scalars()

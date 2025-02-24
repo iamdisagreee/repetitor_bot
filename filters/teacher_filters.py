@@ -247,40 +247,13 @@ class IsSomethingToPay(BaseFilter):
 
         return result.scalar()
 
-# Проверка наступило ли время для пенальти или нет.
-# Если наступило, то добавляем в таблицу penalties.
-# Если количество пенальти == 2, то баним
-class IsPenaltyNow(BaseFilter):
-    async def __call__(self, callback: CallbackQuery, session: AsyncSession,
-                       callback_data: EditStatusPayCallbackFactory):
 
-        teacher_penalty = await give_penalty_by_teacher_id(session,
-                                                           callback.from_user.id)
-        if not teacher_penalty:
-            return True
+class IsPenalty(BaseFilter):
+    async def __call__(self, callback: CallbackQuery,
+                       session: AsyncSession):
+        is_penalty = await session.execute(
+            select(Teacher.penalty)
+            .where(Teacher.teacher_id == callback.from_user.id)
+        )
 
-        week_date = give_date_format_fsm(callback_data.week_date)
-        lesson_on = give_time_format_fsm(callback_data.lesson_on)
-        lesson_off = give_time_format_fsm(callback_data.lesson_off)
-        time_now = time(hour=datetime.now().hour, minute=datetime.now().minute)
-
-        student = await give_student_by_teacher_id(session,
-                                                   callback.from_user.id,
-                                                   week_date,
-                                                   lesson_on)
-
-        if teacher_penalty and time_now > lesson_on:
-            if len(student.penalties) >= 2:
-                student.access.status = False
-                to_delete = delete(Student).where(Student.student_id == student.student_id)
-                await session.execute(to_delete)
-
-            else:
-                penalty = Penalty(student_id=student.student_id,
-                                  week_date=week_date,
-                                  lesson_on=lesson_on,
-                                  lesson_off=lesson_off)
-                session.add(penalty)
-            await session.commit()
-
-        return True
+        return is_penalty.scalar()

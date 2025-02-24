@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from callback_factory.student import ChangeStatusOfAddListCallbackFactory, DeleteStudentToStudyCallbackFactory
 from callback_factory.teacher import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
-    DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory, PlugScheduleLessonWeekDaybackFactory
+    DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory, PlugScheduleLessonWeekDayBackFactory
 from database.teacher_requirements import give_student_by_student_id
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from services.services import NUMERIC_DATE
@@ -151,7 +151,7 @@ def show_next_seven_days_pay_kb(*days):
                   )
                   ]
                   for cur_date in days
-              ] + [[InlineKeyboardButton(text='<назад',
+              ] + [[InlineKeyboardButton(text=LEXICON_TEACHER['back'],
                                          callback_data='auth_teacher')]]
 
     next_seven_days_with_cur_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -238,7 +238,7 @@ async def show_schedule_lesson_day_kb(session: AsyncSession,
             ).pack()
         else:
             status = LEXICON_TEACHER['not_reserved']
-            callback_data = PlugScheduleLessonWeekDaybackFactory(
+            callback_data = PlugScheduleLessonWeekDayBackFactory(
                 plug=button['lesson_on'].strftime("%H:%M")
             ).pack()
 
@@ -301,7 +301,7 @@ def back_to_show_schedule_teacher(week_date_str):
 def settings_teacher_kb():
     settings_teacher = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=LEXICON_TEACHER['information_about_me'],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['information_teacher'],
                                   callback_data='my_profile')],
             [InlineKeyboardButton(text=LEXICON_TEACHER['registration_again'],
                                   callback_data='edit_profile')],
@@ -315,16 +315,28 @@ def settings_teacher_kb():
     return settings_teacher
 
 
-# Клавиатура для выбора что сделать с учениками!
+def back_to_settings_kb():
+    back_to_settings = [
+        [
+            InlineKeyboardButton(
+                text=LEXICON_TEACHER['back'],
+                callback_data='settings_teacher')
+        ]
+    ]
+
+    return InlineKeyboardMarkup(inline_keyboard=back_to_settings)
+
+
+# Клавиатура для выбора, что сделать с учениками!
 def create_management_students_kb():
     buttons = [
-        [InlineKeyboardButton(text='Список добавленных',
-                              callback_data='list_add_students')],
-        [InlineKeyboardButton(text='Добавить',
+        [InlineKeyboardButton(text=LEXICON_TEACHER['add_student'],
                               callback_data='allow_student')],
-        [InlineKeyboardButton(text='Список должников',
+        [InlineKeyboardButton(text=LEXICON_TEACHER['list_added'],
+                              callback_data='list_add_students')],
+        [InlineKeyboardButton(text=LEXICON_TEACHER['list_debtors'],
                               callback_data='list_debtors')],
-        [InlineKeyboardButton(text='<назад',
+        [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
                               callback_data='auth_teacher')]
     ]
 
@@ -341,14 +353,15 @@ def create_list_add_students_kb(students):
     for student in students:
         status_str = ['🔒', '🔑'][student.access.status]
         buttons.append([
-            InlineKeyboardButton(text=f'{status_str} {student.surname} {student.name}',
+            InlineKeyboardButton(text=LEXICON_TEACHER['list_added_students']
+                                 .format(status_str, student.surname, student.name),
                                  callback_data=ChangeStatusOfAddListCallbackFactory(
                                      student_id=student.student_id
                                  ).pack())
         ]
         )
-    buttons.append([InlineKeyboardButton(text='Редактировать', callback_data='delete_student_by_teacher')])
-    buttons.append([InlineKeyboardButton(text='<назад', callback_data='management_students')])
+    buttons.append([InlineKeyboardButton(text=LEXICON_TEACHER['deleting'], callback_data='delete_student_by_teacher')])
+    buttons.append([InlineKeyboardButton(text=LEXICON_TEACHER['back'], callback_data='management_students')])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
@@ -376,12 +389,22 @@ def create_back_to_management_students_kb():
 
 # Клавиатура которая показывает всех учеников со штрафами
 def show_list_of_debtors_kb(students):
-    return InlineKeyboardMarkup(inline_keyboard=[
-                                                    [InlineKeyboardButton(
-                                                        text=f'{student.surname} {student.name} пенальти: {len(student.penalties)}',
-                                                        callback_data=PlugPenaltyTeacherCallbackFactory(
-                                                            plug=''
-                                                        ).pack())]
-                                                    for student in students
-                                                ] + [[InlineKeyboardButton(text='<назад',
-                                                                           callback_data='management_students')]])
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+                            [
+                                InlineKeyboardButton(
+                                    text=LEXICON_TEACHER['information_debtors']
+                                    .format(student.surname,
+                                            student.name,
+                                            len(student.penalties)),
+                                    callback_data=PlugPenaltyTeacherCallbackFactory(
+                                        plug=''
+                                    ).pack())
+                            ]
+                            for student in students
+                        ] + [
+                            [InlineKeyboardButton(
+                                text=LEXICON_TEACHER['back'],
+                                callback_data='management_students')]
+                        ]
+    )

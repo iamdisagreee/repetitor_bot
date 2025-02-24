@@ -32,7 +32,7 @@ class ShowInfoDayCallbackFactory(CallbackData, prefix='show_day', sep='&'):
 
 
 # Затычка для промежутков, которые еще не выбрал ученик
-class PlugScheduleLessonWeekDaybackFactory(CallbackData, prefix='plug_day', sep='-'):
+class PlugScheduleLessonWeekDayBackFactory(CallbackData, prefix='plug_day', sep='-'):
     plug: str
 
 
