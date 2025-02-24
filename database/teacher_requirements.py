@@ -63,6 +63,24 @@ async def give_installed_lessons_week(session: AsyncSession,
     return res_time.scalars()
 
 
+async def give_installed_lessons_week_without_restrictions(
+        session: AsyncSession,
+        teacher_id: int,
+        week_date: date):
+    res_time = await session.execute(
+        select(LessonWeek)
+        .where(
+            and_(
+                LessonWeek.teacher_id == teacher_id,
+                LessonWeek.week_date == week_date,
+            )
+        )
+        .order_by(LessonWeek.work_start)
+    )
+
+    return res_time.scalars()
+
+
 async def delete_week_day(session: AsyncSession,
                           week_id: UUID):
     stmt = select(LessonWeek).where(LessonWeek.week_id == week_id)

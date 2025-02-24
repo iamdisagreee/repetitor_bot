@@ -148,12 +148,18 @@ def give_result_info(result_status):
 
 ############################################## УЧИТЕЛЬ #########################################3
 def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
+    # installed_lessons_week):
     cur_buttons = []
     last_one = {'lesson_on': -1,
                 'lesson_off': -1,
                 'student_id': -1,
                 'list_status': []}
+    start, end = 0, 0
+    # Случай, когда ученик не выбрал уроков вообще
     for interval in list_lessons_not_formatted:
+        if not start:
+            start = interval.work_start
+        end = interval.work_end
         if interval.lessons:
             lessons_sort = sorted(interval.lessons, key=lambda gap: gap.lesson_start)
             if lessons_sort[0].lesson_start == last_one['lesson_off'] and \
@@ -172,6 +178,15 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
                                    'list_status': [lessons_sort[0].status]
                                    }
 
+            # Проверка на то, что занятия начинаются не с начала промежутка
+            if interval_result['lesson_on'] != interval.work_start:
+                cur_buttons.append(
+                    {'lesson_on': interval.work_start,
+                     'lesson_off': interval_result['lesson_on'],
+                     'student_id': None,
+                     'list_status': [-1]}
+                )
+
             index = 1
             while index < len(lessons_sort):
                 gap = lessons_sort[index]
@@ -180,6 +195,15 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
                     interval_result['list_status'].append(gap.status)
                 else:
                     cur_buttons.append(interval_result)
+                    # Добавляем промежуток, который не выбран учениками
+                    cur_buttons.append(
+                        {
+                            'lesson_on': cur_buttons[-1]['lesson_off'],
+                            'lesson_off': gap.lesson_start,
+                            'student_id': None,
+                            'list_status': [-1]
+                        }
+                    )
                     interval_result = {'lesson_on': gap.lesson_start,
                                        'lesson_off': gap.lesson_finished,
                                        'student_id': gap.student_id,
@@ -187,6 +211,25 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
                 index += 1
 
             cur_buttons.append(interval_result)
+            # Проверка на остаток пустого промежутка
+            if interval_result['lesson_off'] != interval.work_end:
+                cur_buttons.append(
+                    {
+                        'lesson_on': interval_result['lesson_off'],
+                        'lesson_off': interval.work_end,
+                        'student_id': None,
+                        'list_status': [-1]
+                    }
+                )
             last_one = interval_result
-    # print(cur_buttons)
+
+    if not cur_buttons:
+        cur_buttons.append(
+            {
+                'lesson_on': start,
+                'lesson_off': end,
+                'student_id': None,
+                'list_status': [-1]
+            }
+        )
     return cur_buttons

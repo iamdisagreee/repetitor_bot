@@ -220,7 +220,21 @@ class IsLessonWeekInDatabaseState(BaseFilter):
         return result.scalar()
 
 
-class IsSomethingToConfirm(BaseFilter):
+class IsSomethingToShowSchedule(BaseFilter):
+    async def __call__(self, callback: CallbackQuery, session: AsyncSession,
+                       callback_data: ShowDaysOfPayCallbackFactory):
+        week_date_str = callback_data.week_date
+        week_date = give_date_format_fsm(week_date_str)
+
+        result = await session.execute(
+            select(LessonWeek.week_id)
+            .where(LessonWeek.week_date == week_date)
+        )
+
+        return result.scalar()
+
+
+class IsSomethingToPay(BaseFilter):
     async def __call__(self, callback: CallbackQuery, session: AsyncSession,
                        callback_data: ShowDaysOfPayCallbackFactory):
         week_date_str = callback_data.week_date
@@ -232,7 +246,6 @@ class IsSomethingToConfirm(BaseFilter):
         )
 
         return result.scalar()
-
 
 # Проверка наступило ли время для пенальти или нет.
 # Если наступило, то добавляем в таблицу penalties.

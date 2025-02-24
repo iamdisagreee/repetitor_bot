@@ -28,16 +28,19 @@ class ShowInfoDayCallbackFactory(CallbackData, prefix='show_day', sep='&'):
     lesson_off: str
     week_date: str
     status: bool
+    price: float
 
 
-# class ShowDeleteLessonCallbackFactory(CallbackData, prefix='delete_days'):
-#     week_date: str
+# Затычка для промежутков, которые еще не выбрал ученик
+class PlugScheduleLessonWeekDaybackFactory(CallbackData, prefix='plug_day', sep='-'):
+    plug: str
 
 
 class DeleteDayScheduleCallbackFactory(CallbackData, prefix='delete_day', sep='&'):
     lesson_on: str
     lesson_off: str
     week_date: str
+
 
 class PlugPenaltyTeacherCallbackFactory(CallbackData, prefix='plug'):
     plug: str

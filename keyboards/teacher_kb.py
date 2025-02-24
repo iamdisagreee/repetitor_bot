@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from callback_factory.student import ChangeStatusOfAddListCallbackFactory, DeleteStudentToStudyCallbackFactory
 from callback_factory.teacher import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
-    DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory
+    DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory, PlugScheduleLessonWeekDaybackFactory
 from database.teacher_requirements import give_student_by_student_id
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from services.services import NUMERIC_DATE
@@ -135,10 +135,6 @@ def create_all_records_week_day(weeks_day):
     return all_records_week_day_kb
 
 
-# f'{} - '
-#                                              f'{NUMERIC_DATE[date(year=cur_date.year,
-#                                                                   month=cur_date.month,
-#                                                                   day=cur_date.day).isoweekday()]}'
 def show_next_seven_days_pay_kb(*days):
     buttons = [
                   [InlineKeyboardButton(text=LEXICON_TEACHER['next_seven_days_pay_kb'].format(
@@ -169,7 +165,9 @@ async def show_status_lesson_day_kb(cur_buttons,
     res_buttons = []
 
     for button in cur_buttons:
-        # print(button)
+        # Случай, когда кнопка пустая
+        if button['student_id'] is None:
+            continue
         student = await give_student_by_student_id(session, button['student_id'])
         price = student.price / 2 * len(button['list_status'])
         status = '✅' if len(button['list_status']) == sum(button['list_status']) else '❌'
@@ -178,9 +176,6 @@ async def show_status_lesson_day_kb(cur_buttons,
                 text=LEXICON_TEACHER['status_lesson_day_kb'].format(
                     status, student.name, button['lesson_on'].strftime("%H:%M"),
                     button['lesson_off'].strftime("%H:%M"), price),
-
-                # text=f'{status} {student.name} {button['lesson_on'].strftime("%H:%M")} - '
-                #      f'{button['lesson_off'].strftime("%H:%M")} {price} руб.',
                 callback_data=EditStatusPayCallbackFactory(
                     lesson_on=button['lesson_on'].strftime("%H:%M"),
                     lesson_off=button['lesson_off'].strftime("%H:%M"),
@@ -223,36 +218,47 @@ def show_next_seven_days_schedule_teacher_kb(*days):
     return next_seven_days_with_cur_kb
 
 
-def show_schedule_lesson_day_kb(cur_buttons,
-                                week_date_str: str):
+async def show_schedule_lesson_day_kb(session: AsyncSession,
+                                      cur_buttons,
+                                      week_date_str: str):
     builder = InlineKeyboardBuilder()
     res_buttons = []
-
     for button in cur_buttons:
-        status_bool = len(button['list_status']) == sum(button['list_status'])
-        status = '✅' if status_bool else '❌'
+        if button['list_status'] != [-1]:
+            status_bool = len(button['list_status']) == sum(button['list_status'])
+            status = LEXICON_TEACHER['paid'] if status_bool \
+                else LEXICON_TEACHER['not_paid']
+            student = await give_student_by_student_id(session, button['student_id'])
+            callback_data = ShowInfoDayCallbackFactory(
+                lesson_on=button['lesson_on'].strftime("%H:%M"),
+                lesson_off=button['lesson_off'].strftime("%H:%M"),
+                week_date=week_date_str,
+                status=status_bool,
+                price=student.price / 2 * len(button['list_status'])
+            ).pack()
+        else:
+            status = LEXICON_TEACHER['not_reserved']
+            callback_data = PlugScheduleLessonWeekDaybackFactory(
+                plug=button['lesson_on'].strftime("%H:%M")
+            ).pack()
+
         res_buttons.append(
             InlineKeyboardButton(
                 text=LEXICON_TEACHER['text_schedule_lesson_day'].format(
                     status, button['lesson_on'].strftime("%H:%M"),
                     button['lesson_off'].strftime("%H:%M")
                 ),
-                callback_data=ShowInfoDayCallbackFactory(
-                    lesson_on=button['lesson_on'].strftime("%H:%M"),
-                    lesson_off=button['lesson_off'].strftime("%H:%M"),
-                    week_date=week_date_str,
-                    status=status_bool
-                ).pack()
+                callback_data=callback_data
             )
         )
 
-        res_buttons.append(
-            InlineKeyboardButton(text='<назад',
-                                 callback_data='schedule_show'
-                                 )
-        )
+    res_buttons.append(
+        InlineKeyboardButton(text=LEXICON_TEACHER['back'],
+                             callback_data='schedule_show'
+                             )
+    )
 
-        builder.row(*res_buttons, width=1)
+    builder.row(*res_buttons, width=1)
 
     return builder.as_markup()
 
@@ -281,7 +287,7 @@ def back_to_show_or_delete_schedule_teacher(week_date_str,
 
 def back_to_show_schedule_teacher(week_date_str):
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='<назад',
+        [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
                               callback_data=ShowDaysOfScheduleTeacherCallbackFactory(
                                   week_date=week_date_str
                               ).pack()
@@ -295,11 +301,13 @@ def back_to_show_schedule_teacher(week_date_str):
 def settings_teacher_kb():
     settings_teacher = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text='Заполнить профиль заново',
+            [InlineKeyboardButton(text=LEXICON_TEACHER['information_about_me'],
+                                  callback_data='my_profile')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['registration_again'],
                                   callback_data='edit_profile')],
-            [InlineKeyboardButton(text='❌Удалить профиль❌',
+            [InlineKeyboardButton(text=LEXICON_TEACHER['delete_profile'],
                                   callback_data='delete_profile')],
-            [InlineKeyboardButton(text='<назад',
+            [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
                                   callback_data='auth_teacher')]
         ]
     )
