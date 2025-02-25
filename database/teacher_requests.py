@@ -47,18 +47,32 @@ async def command_add_lesson_week(session: AsyncSession,
 async def give_installed_lessons_week(session: AsyncSession,
                                       teacher_id: int,
                                       week_date: date):
-    res_time = await session.execute(
-        select(LessonWeek)
-        .where(
-            and_(
-                LessonWeek.teacher_id == teacher_id,
-                LessonWeek.week_date == week_date,
-                # LessonWeek.work_end > time(hour=datetime.now().hour,
-                #                            minute=datetime.now().minute)
+    now = datetime.now()
+    cur_time = now.time()
+    cur_date = now.date()
+    if cur_date == week_date:
+        res_time = await session.execute(
+            select(LessonWeek)
+            .where(
+                and_(
+                    LessonWeek.teacher_id == teacher_id,
+                    LessonWeek.week_date == week_date,
+                    LessonWeek.work_end > cur_time
+                )
             )
+            .order_by(LessonWeek.work_start)
         )
-        .order_by(LessonWeek.work_start)
-    )
+    else:
+        res_time = await session.execute(
+            select(LessonWeek)
+            .where(
+                and_(
+                    LessonWeek.teacher_id == teacher_id,
+                    LessonWeek.week_date == week_date,
+                )
+            )
+            .order_by(LessonWeek.work_start)
+        )
 
     return res_time.scalars()
 

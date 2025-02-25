@@ -5,6 +5,7 @@ from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
 from database import Student, LessonDay
+from database.models import Penalty
 from database.models.lesson_week import LessonWeek
 from database.models.teacher import Teacher
 
@@ -101,10 +102,11 @@ async def add_lesson_day(session: AsyncSession,
 
 async def give_teacher_id_by_student_id(session: AsyncSession,
                                         student_id: int):
-    teacher_id = await session.execute(select(Student)
-                                       .where(Student.student_id == student_id))
+    student = await session.execute(select(Student)
+                                    .where(Student.student_id == student_id)
+                                    .options(selectinload(Student.teacher)))
 
-    return teacher_id.scalar()
+    return student.scalar()
 
 
 async def give_week_id_by_teacher_id(session: AsyncSession,
@@ -128,12 +130,28 @@ async def give_week_id_by_teacher_id(session: AsyncSession,
 async def give_all_lessons_for_day(session: AsyncSession,
                                    week_date: date,
                                    student_id: int):
+    now = datetime.now()
+    # cur_time = now.time()
+    # cur_date = now.date()
+
+    # if cur_date == week_date:
+    #     all_lessons_for_day = await session.execute(
+    #         select(LessonDay)
+    #         .where(
+    #             and_(
+    #                 LessonDay.student_id == student_id,
+    #                 LessonDay.week_date == week_date,
+    #                 LessonDay.lesson_start > cur_time
+    #             )
+    #         ).order_by(LessonDay.lesson_start)
+    #     )
+    # else:
     all_lessons_for_day = await session.execute(
         select(LessonDay)
         .where(
             and_(
                 LessonDay.student_id == student_id,
-                LessonDay.week_date == week_date
+                LessonDay.week_date == week_date,
             )
         ).order_by(LessonDay.lesson_start)
     )
@@ -204,12 +222,10 @@ async def delete_student_profile(session: AsyncSession,
 
 async def give_students_penalty(session: AsyncSession,
                                 student_id: int):
-    students = await session.execute(
-        select(Student)
-        .where(
-            Student.student_id == student_id
-        )
-        .options(selectinload(Student.penalties))
+
+    student_penalties = await session.execute(
+        select(Penalty)
+        .where(Penalty.student_id == student_id)
     )
 
-    return students.scalar()
+    return student_penalties.scalars().all()

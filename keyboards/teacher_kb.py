@@ -1,15 +1,14 @@
-from datetime import date, time
+from datetime import date
 
-from sqlalchemy import select
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from callback_factory.student import ChangeStatusOfAddListCallbackFactory, DeleteStudentToStudyCallbackFactory
-from callback_factory.teacher import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
+from callback_factory.student_factories import ChangeStatusOfAddListCallbackFactory, DeleteStudentToStudyCallbackFactory
+from callback_factory.teacher_factories import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
     DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory, PlugScheduleLessonWeekDayBackFactory
-from database.teacher_requirements import give_student_by_student_id
+from database.teacher_requests import give_student_by_student_id
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from services.services import NUMERIC_DATE
 
@@ -376,13 +375,13 @@ def create_list_delete_students_kb(students):
                                  ).pack())
         ]
         )
-    buttons.append([InlineKeyboardButton(text='<выйти', callback_data='management_students')])
+    buttons.append([InlineKeyboardButton(text=LEXICON_TEACHER['exit'], callback_data='management_students')])
     return InlineKeyboardMarkup(inline_keyboard=buttons)
 
 
 def create_back_to_management_students_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
-        [InlineKeyboardButton(text='<назад',
+        [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
                               callback_data='management_students')]
     ])
 

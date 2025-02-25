@@ -10,7 +10,6 @@ from database import AccessTeacher, AccessStudent
 
 
 # Открываем сессию
-# Кеширование?????
 class DbSessionMiddleware(BaseMiddleware):
     def __init__(self, session_pool: async_sessionmaker):
         self.session_pool = session_pool
@@ -19,12 +18,6 @@ class DbSessionMiddleware(BaseMiddleware):
                        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
                        event: TelegramObject,
                        data: Dict[str, Any]):
-        # print(event.model_dump_json(indent=4))
-        # user_id = event.callback_query.from_user.id
-        # if isinstance(event, CallbackQuery):
-        #     pass
-        # print(event.from_user.id)
-        # print('123123123123123123132')
 
         async with self.session_pool() as session:
             available_teachers = await session.execute(select(AccessTeacher.teacher_id)
@@ -35,13 +28,6 @@ class DbSessionMiddleware(BaseMiddleware):
                                           in available_teachers.scalars()]
             data["available_students"] = [student for student in
                                           available_students.scalars()]
-           # print('Учителя:',data["available_teachers"])
-           # print('Студенты:', data['available_students'])
-            # print([x for x in available_students.scalars()])
-            # print(859717714 in data["available_students"],
-            #       859717714 in data["available_teachers"])
-
-            # print(data["available_students"])
             data["session"] = session
             return await handler(event, data)
 

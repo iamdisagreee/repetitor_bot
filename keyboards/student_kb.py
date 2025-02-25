@@ -1,10 +1,9 @@
-from datetime import date, timedelta, datetime, time
+from datetime import date
 
-from aiogram.fsm.state import StatesGroup, State
 from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import InlineKeyboardBuilder
 
-from callback_factory.student import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
+from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
     StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory
 from lexicon.lexicon_student import LEXICON_STUDENT
@@ -247,11 +246,13 @@ def create_button_for_back_to_all_lessons_day(week_date):
 def create_settings_profile_kb():
     settings_profile_kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text='Заполнить заново',
+            [InlineKeyboardButton(text=LEXICON_STUDENT['information_student'],
+                                  callback_data='my_profile_student')],
+            [InlineKeyboardButton(text=LEXICON_STUDENT['registration_again'],
                                   callback_data='edit_profile')],
-            [InlineKeyboardButton(text='❌Удалить профиль❌',
+            [InlineKeyboardButton(text=LEXICON_STUDENT['delete_profile'],
                                   callback_data='delete_profile')],
-            [InlineKeyboardButton(text='<назад',
+            [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
                                   callback_data='auth_student')]
         ]
     )
@@ -259,16 +260,23 @@ def create_settings_profile_kb():
     return settings_profile_kb
 
 
-def create_information_penalties(students_penalty):
-    # print(x.week_date for x in students_penalty.penalties)
+def create_back_to_settings_student_kb():
+    return InlineKeyboardMarkup(inline_keyboard=[
+        [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
+                              callback_data='settings_student')]
+    ])
+
+
+def create_information_penalties(student_penalties):
     buttons = [
-                  [InlineKeyboardButton(text=f'{penalty.week_date} {penalty.lesson_on}'
-                                             f' - {penalty.lesson_off}',
+                  [InlineKeyboardButton(text=LEXICON_STUDENT['information_penalty']
+                                        .format(penalty.week_date, penalty.lesson_on,
+                                                penalty.lesson_off),
                                         callback_data=PlugPenaltyStudentCallbackFactory(
                                             plug=''
                                         ).pack())]
-                  for penalty in students_penalty.penalties
-              ] + [[InlineKeyboardButton(text='<назад', callback_data='auth_student')]]
+                  for penalty in student_penalties
+              ] + [[InlineKeyboardButton(text=LEXICON_STUDENT['back'], callback_data='auth_student')]]
 
     information_penalties_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
 

@@ -1,54 +1,41 @@
-from datetime import date, datetime, timedelta, time
-from pprint import pprint
+from datetime import datetime
 
-from aiogram import Router, F, Bot
-from aiogram.filters import CommandStart, StateFilter, Command, BaseFilter
-from aiogram.filters.callback_data import CallbackData
-from aiogram.fsm import state
-from aiogram.fsm.context import FSMContext
+from aiogram import Router, F
+from aiogram.filters import StateFilter
+
 from aiogram.fsm.state import StatesGroup, State, default_state
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
-from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
+from sqlalchemy.ext.asyncio import AsyncSession
 
-from callback_factory.student import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
+from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
     StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory
-from database.student_requirements import command_get_all_teachers, command_add_students, give_lessons_week_for_day, \
+from database.student_requests import command_get_all_teachers, command_add_students, give_lessons_week_for_day, \
     add_lesson_day, give_teacher_id_by_student_id, give_all_busy_time_intervals, \
-    give_all_lessons_for_day, remove_lesson_day, give_week_id_by_teacher_id, give_all_information_teacher, \
+    give_all_lessons_for_day, remove_lesson_day, give_week_id_by_teacher_id, \
     give_information_of_lesson, delete_student_profile, give_students_penalty
-from filters.student_filters import IsStudentInDatabase, IsInputFieldAlpha, IsInputFieldDigit, \
+from filters.student_filters import IsStudentInDatabase, IsInputFieldAlpha, \
     FindNextSevenDaysFromKeyboard, IsMoveRightAddMenu, IsMoveLeftMenu, IsTeacherDidSlots, IsStudentChooseSlots, \
     IsMoveRightRemoveMenu, IsLessonsInChoseDay, IsTimeNotExpired, IsFreeSlots, IsTeacherDidSystemPenalties, \
     IsStudentHasPenalties, StudentStartFilter, IsRightClassCourse, IsRightPrice
+from fsm.fsm_student import FSMRegistrationStudentForm
 from keyboards.everyone_kb import create_start_kb
 from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, create_level_choice_kb, \
     create_back_to_entrance_kb, create_authorization_kb, show_next_seven_days_settings_kb, create_menu_add_remove_kb, \
     create_choose_time_student_kb, create_delete_lessons_menu, show_next_seven_days_schedule_kb, all_lessons_for_day_kb, \
-    create_button_for_back_to_all_lessons_day, create_settings_profile_kb, create_information_penalties
+    create_button_for_back_to_all_lessons_day, create_settings_profile_kb, create_information_penalties, \
+    create_back_to_settings_student_kb
+from lexicon.lexicon_all import LEXICON_ALL
 from lexicon.lexicon_student import LEXICON_STUDENT
 from services.services import give_list_with_days, create_choose_time_student, give_date_format_fsm, \
-    give_time_format_fsm, create_delete_time_student, show_all_lessons_for_day, give_result_status_timeinterval, \
-    give_result_info
+    give_time_format_fsm, create_delete_time_student, show_all_lessons_for_day, \
+    give_text_information_lesson, course_class_choose, COUNT_BAN
 
 # Преподаватель - нет доступа
 # Ученик - открываем
 router = Router()
 router.callback_query.filter(StudentStartFilter())
-
-
-class FSMRegistrationStudentForm(StatesGroup):
-    fill_name = State()
-    fill_surname = State()
-    fill_city = State()
-    fill_place_study = State()
-    fill_level = State()
-    fill_level_class = State()
-    fill_level_course = State()
-    fill_subject = State()
-    fill_teacher = State()
-    fill_price = State()
 
 
 ############################### Логика входа в меню идентификации #######################################
@@ -72,7 +59,7 @@ async def process_start_registration(callback: CallbackQuery, state: FSMContext)
 # Ловим имя и просим ввести фамилию
 @router.message(StateFilter(FSMRegistrationStudentForm.fill_name), IsInputFieldAlpha())
 async def process_name_sent(message: Message, state: FSMContext):
-    await state.update_data(name=message.text)
+    await state.update_data(name=message.text.capitalize())
     await message.answer(text=LEXICON_STUDENT['fill_surname'])
     await state.set_state(FSMRegistrationStudentForm.fill_surname)
 
@@ -86,7 +73,7 @@ async def process_name_not_sent(message: Message):
 # Ловим фамилию и просим ввести город
 @router.message(StateFilter(FSMRegistrationStudentForm.fill_surname), IsInputFieldAlpha())
 async def process_surname_sent(message: Message, state: FSMContext):
-    await state.update_data(surname=message.text)
+    await state.update_data(surname=message.text.capitalize())
     await message.answer(text=LEXICON_STUDENT['fill_city'])
     await state.set_state(FSMRegistrationStudentForm.fill_city)
 
@@ -100,7 +87,7 @@ async def process_surname_not_sent(message: Message):
 # Ловим город и просим ввести место обучения
 @router.message(StateFilter(FSMRegistrationStudentForm.fill_city), IsInputFieldAlpha())
 async def process_city_sent(message: Message, state: FSMContext):
-    await state.update_data(city=message.text)
+    await state.update_data(city=message.text.capitalize())
     await message.answer(text=LEXICON_STUDENT['fill_place_study'])
     await state.set_state(FSMRegistrationStudentForm.fill_place_study)
 
@@ -176,10 +163,10 @@ async def process_class_sent(message: Message):
     await message.answer(LEXICON_STUDENT['not_fill_course'])
 
 
-# Вводим предмет и просим выбрать учителя!
+# Ловим предмет и просим выбрать учителя!
 @router.message(StateFilter(FSMRegistrationStudentForm.fill_subject), IsInputFieldAlpha())
 async def process_subject_sent(message: Message, session: AsyncSession, state: FSMContext):
-    await state.update_data(subject=message.text)
+    await state.update_data(subject=message.text.capitalize())
 
     all_teachers = await command_get_all_teachers(session)
     await message.answer(text=LEXICON_STUDENT['fill_teacher'],
@@ -227,7 +214,7 @@ async def process_price_sent(message: Message):
 # Случай, когда ученик находится в бд, но хочет зарегистрироваться
 @router.callback_query(F.data == 'reg_student', IsStudentInDatabase())
 async def process_not_start_registration(callback: CallbackQuery):
-    await callback.answer(text=LEXICON_STUDENT['now_registered'])
+    await callback.answer(text=LEXICON_STUDENT['now_registered'], show_alert=True)
 
 
 # Случай, когда еще не зарегистрировался, но хочет зайти авторизоваться
@@ -280,9 +267,14 @@ async def process_add_time_study(callback: CallbackQuery, session: AsyncSession,
                                                       week_date)
 
     lessons_week = await give_lessons_week_for_day(session, week_date, student.teacher_id)
-    dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date)
-
-    await callback.message.edit_text(text=LEXICON_STUDENT['choose_slot'],
+    dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date,
+                                              student.teacher.penalty)
+    # В зависимости от режима пенальти печатаем по-разному:
+    if student.teacher.penalty:
+        text = LEXICON_STUDENT['choose_slot_penalty'].format(student.teacher.penalty)
+    else:
+        text = LEXICON_STUDENT['choose_slot']
+    await callback.message.edit_text(text=text,
                                      reply_markup=create_choose_time_student_kb(
                                          dict_lessons,
                                          week_date_str,
@@ -306,10 +298,15 @@ async def process_move_right_add_menu(callback: CallbackQuery, session: AsyncSes
                                                       week_date)
 
     lessons_week = await give_lessons_week_for_day(session, week_date, student.teacher_id)
-    dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date)
+    dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date,
+                                              student.teacher.penalty)
 
-    await callback.message.edit_text(text=LEXICON_STUDENT['choose_slot']
-                                     ,
+    # В зависимости от режима пенальти печатаем по-разному:
+    if student.teacher.penalty:
+        text = LEXICON_STUDENT['choose_slot_penalty'].format(student.teacher.penalty)
+    else:
+        text = LEXICON_STUDENT['choose_slot']
+    await callback.message.edit_text(text=text,
                                      reply_markup=create_choose_time_student_kb(
                                          dict_lessons,
                                          week_date_str,
@@ -333,9 +330,15 @@ async def process_move_right_add_menu(callback: CallbackQuery, session: AsyncSes
                                                       week_date)
 
     lessons_week = await give_lessons_week_for_day(session, week_date, student.teacher_id)
-    dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date)
+    dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date,
+                                              student.teacher.penalty)
 
-    await callback.message.edit_text(text=LEXICON_STUDENT['choose_slot'],
+    # В зависимости от режима пенальти печатаем по-разному:
+    if student.teacher.penalty:
+        text = LEXICON_STUDENT['choose_slot_penalty'].format(student.teacher.penalty)
+    else:
+        text = LEXICON_STUDENT['choose_slot']
+    await callback.message.edit_text(text=text,
                                      reply_markup=create_choose_time_student_kb(
                                          dict_lessons,
                                          week_date_str,
@@ -389,9 +392,15 @@ async def process_touch_menu_add(callback: CallbackQuery, session: AsyncSession,
                                                       week_date)
 
     lessons_week = await give_lessons_week_for_day(session, week_date, student.teacher_id)
-    dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date)
+    dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date,
+                                              student.teacher.penalty)
     page = state_dict['page']
-    await callback.message.edit_text(text=LEXICON_STUDENT['choose_slot'],
+    # В зависимости от режима пенальти печатаем по-разному:
+    if student.teacher.penalty:
+        text = LEXICON_STUDENT['choose_slot_penalty'].format(student.teacher.penalty)
+    else:
+        text = LEXICON_STUDENT['choose_slot']
+    await callback.message.edit_text(text=text,
                                      reply_markup=create_choose_time_student_kb(
                                          dict_lessons,
                                          week_date_str,
@@ -579,8 +588,6 @@ async def process_show_full_information_lesson(callback: CallbackQuery, session:
     student = await give_teacher_id_by_student_id(session,
                                                   callback.from_user.id)
 
-    teacher = await give_all_information_teacher(session,
-                                                 student.teacher_id)
     # Проверка на оплату
     lesson_on = give_time_format_fsm(callback_data.lesson_on)
     lesson_off = give_time_format_fsm(callback_data.lesson_off)
@@ -590,23 +597,43 @@ async def process_show_full_information_lesson(callback: CallbackQuery, session:
                                                                     lesson_on,
                                                                     lesson_off)
 
-    result_status, counter_lessons = give_result_status_timeinterval(information_of_status_lesson)
-    status_info = give_result_info(result_status)
+    # Получаем информацию об уроке в зависимости от системы пенальти
+    text_information_lesson = give_text_information_lesson(student,
+                                                           week_date,
+                                                           lesson_on,
+                                                           lesson_off,
+                                                           information_of_status_lesson)
 
     # Выводим информацию
-    await callback.message.edit_text(text=LEXICON_STUDENT['information_about_lesson'].format(
-        teacher.surname, teacher.name, callback_data.lesson_on, callback_data.lesson_off,
-        teacher.phone,teacher.bank, student.price * counter_lessons / 2,  status_info),
-        reply_markup=create_button_for_back_to_all_lessons_day(week_date_str)
-    )
+    await callback.message.edit_text(text=text_information_lesson,
+                                     reply_markup=create_button_for_back_to_all_lessons_day(week_date_str)
+                                     )
 
 
 ###################################### Кнопка НАСТРОЙКИ #############################################
 
 @router.callback_query(F.data == 'settings_student')
 async def process_create_menu_settings(callback: CallbackQuery):
-    await callback.message.edit_text(text='Выберите, что хотите сделать!',
+    await callback.message.edit_text(text=LEXICON_STUDENT['menu_settings'],
                                      reply_markup=create_settings_profile_kb())
+
+
+# Выбрали __Информация обо мне_
+@router.callback_query(F.data == 'my_profile_student')
+async def process_show_information_profile(callback: CallbackQuery, session: AsyncSession):
+    student = await give_teacher_id_by_student_id(session,
+                                                  callback.from_user.id)
+    course_class = course_class_choose(student.class_learning,
+                                       student.course_learning)
+    await callback.message.edit_text(text=LEXICON_STUDENT['information_about_student']
+                                     .format(student.name,
+                                             student.surname,
+                                             student.city,
+                                             student.place_study,
+                                             course_class,
+                                             student.subject,
+                                             student.price),
+                                     reply_markup=create_back_to_settings_student_kb())
 
 
 # Выбрали __Редактировать профиль__
@@ -621,17 +648,18 @@ async def process_change_settings_profile(callback: CallbackQuery, state: FSMCon
 async def process_delete_profile(callback: CallbackQuery, session: AsyncSession):
     await delete_student_profile(session,
                                  callback.from_user.id)
-    await callback.message.edit_text(text="Здравствуйте, выберите роль!",
+    await callback.message.edit_text(text=LEXICON_ALL['start'],
                                      reply_markup=create_start_kb())
 
 
 ######################################## Кнопка ШТРАФЫ #############################################
 @router.callback_query(F.data == 'penalties', IsTeacherDidSystemPenalties(), IsStudentHasPenalties())
 async def process_penalties(callback: CallbackQuery, session: AsyncSession):
-    students_penalty = await give_students_penalty(session, callback.from_user.id)
+    student_penalties = await give_students_penalty(session, callback.from_user.id)
 
-    await callback.message.edit_text(text='Ваши пенальти!',
-                                     reply_markup=create_information_penalties(students_penalty))
+    await callback.message.edit_text(text=LEXICON_STUDENT['penalty_menu']
+                                     .format(COUNT_BAN - len(student_penalties)),
+                                     reply_markup=create_information_penalties(student_penalties))
 
 
 # Нажатие на кнопки с информацией - ничего не должно происходить
@@ -640,13 +668,19 @@ async def process_not_penalties(callback: CallbackQuery):
     await callback.answer()
 
 
-# Случай, когда учитель не установил систему пенальти!
+# Случай, когда учитель не включил систему пенальти!
 @router.callback_query(F.data == 'penalties', ~IsTeacherDidSystemPenalties())
 async def process_not_work_penalties(callback: CallbackQuery):
-    await callback.answer('Ваш репетитор отключил систему пенальти!')
+    await callback.answer(LEXICON_STUDENT['system_off'])
 
 
 # Случай, когда у ученика нет пенальти!
 @router.callback_query(F.data == 'penalties', ~IsStudentHasPenalties())
 async def process_not_penalties(callback: CallbackQuery):
-    await callback.answer('У вас нет пенальти!')
+    await callback.answer(LEXICON_STUDENT['has_not_penalty'])
+
+
+# Ввели что-то не то
+# @router.message()
+# async def process_incorrect_input(message: Message):
+#     await message.answer(text=LEXICON_ALL['incorrect_input'])

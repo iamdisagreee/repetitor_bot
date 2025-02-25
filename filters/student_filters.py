@@ -1,20 +1,16 @@
-import re
-from datetime import timedelta, datetime, time, date
-from pprint import pprint
-from typing import Dict, Any
+from datetime import timedelta, datetime
 
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from aiogram.filters import BaseFilter
-from pydantic import json
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
-from callback_factory.student import ShowDaysOfScheduleCallbackFactory, DeleteFieldCallbackFactory
+from callback_factory.student_factories import ShowDaysOfScheduleCallbackFactory, DeleteFieldCallbackFactory
 from database import Student, LessonWeek, LessonDay
 from database.models import Penalty
-from database.student_requirements import give_lessons_week_for_day, give_all_busy_time_intervals, \
+from database.student_requests import give_lessons_week_for_day, give_all_busy_time_intervals, \
     give_teacher_id_by_student_id, give_all_lessons_for_day
 from services.services import give_list_with_days, give_date_format_fsm, create_choose_time_student, \
     create_delete_time_student, give_time_format_fsm
@@ -57,6 +53,7 @@ class IsRightPrice(BaseFilter):
     async def __call__(self, message):
         return message.text.isdigit() and int(message.text) >= 0
 
+
 class FindNextSevenDaysFromKeyboard(BaseFilter):
     async def __call__(self, callback: CallbackQuery):
         my_days = [
@@ -79,7 +76,8 @@ class IsMoveRightAddMenu(BaseFilter):
                                                           student.teacher_id,
                                                           week_date)
 
-        dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date)
+        dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date,
+                                                  student.teacher.penalty)
 
         page = 0
         for day, times in dict_lessons.items():
@@ -127,7 +125,8 @@ class IsFreeSlots(BaseFilter):
                                                           week_date)
 
         lessons_week = await give_lessons_week_for_day(session, week_date, student.teacher_id)
-        dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date)
+        dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date,
+                                                  student.teacher.penalty)
         return sum(bool(value) for value in dict_lessons.values()) != 0
 
 
@@ -194,12 +193,17 @@ class IsTimeNotExpired(BaseFilter):
         if student.teacher.penalty == 0:
             return True
 
+        cur_date = datetime.now().date()
         penalty_delta = timedelta(hours=student.teacher.penalty)
         lesson_start = give_time_format_fsm(callback_data.lesson_start)
-        cur_delta = timedelta(hours=lesson_start.hour, minutes=lesson_start.minute)
-        now_delta = timedelta(hours=datetime.now().hour, minutes=datetime.now().minute)
+        cur_datetime = datetime(year=cur_date.year,
+                                month=cur_date.month,
+                                day=cur_date.day,
+                                hour=lesson_start.hour,
+                                minute=lesson_start.minute)
+        now_datetime = datetime.now()
 
-        return now_delta < cur_delta - penalty_delta
+        return now_datetime > cur_datetime - penalty_delta
 
 
 # Фильтр отвечает за то, установил учитель систему пенальти или нет (подгружаем teacher для ученика)

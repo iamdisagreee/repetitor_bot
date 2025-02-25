@@ -1,6 +1,21 @@
 from datetime import date
 
-from aiogram.types import ReplyKeyboardMarkup, KeyboardButton, InlineKeyboardMarkup, InlineKeyboardButton
+from aiogram import Bot
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
+
+from lexicon.lexicon_all import LEXICON_MENU
+
+
+# Устанавливаем вываливающееся меню
+async def set_new_menu(bot: Bot):
+    main_menu_commands = [
+        BotCommand(
+            command=command,
+            description=description
+        )
+        for command, description in LEXICON_MENU.items()
+    ]
+    await bot.set_my_commands(main_menu_commands)
 
 
 def create_start_kb():

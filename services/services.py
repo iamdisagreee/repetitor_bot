@@ -1,6 +1,10 @@
 from datetime import datetime, timedelta, date, time
 from pprint import pprint
 
+from database import Student
+from lexicon.lexicon_all import LEXICON_ALL
+from lexicon.lexicon_student import LEXICON_STUDENT
+
 NUMBER_FINES = 3
 NUMERIC_DATE = {1: 'понедельник',
                 2: 'вторник',
@@ -52,7 +56,8 @@ def give_list_registrations_str(res_time):
 
 ########################################## СТУДЕНТ ###############################
 # Создаем словарь словарей в котором хранятся все ячейки для выбора студентом дат
-def create_choose_time_student(lessons_week, lessons_busy, week_date):
+def create_choose_time_student(lessons_week, lessons_busy, week_date,
+                               penalty_time):
     list_busy = [[lesson.lesson_start, lesson.lesson_finished] for lesson in lessons_busy]
     slots = {day: [] for day in range(1, 9)}
     page_slots = 1
@@ -77,11 +82,16 @@ def create_choose_time_student(lessons_week, lessons_busy, week_date):
             cur_dict['lesson_start'] = time(hour=start_time.hour, minute=start_time.minute)
             start_time += delta_30
             cur_dict['lesson_end'] = time(hour=start_time.hour, minute=start_time.minute)
-
-            if [cur_dict['lesson_start'], cur_dict['lesson_end']] in list_busy or \
-                    now >= datetime(year=week_date.year, month=week_date.month, day=week_date.day,
+            # Случаи:
+            #    1. Текущий слот уже занят
+            #    2. Текущий слот уже наступил
+            #    3. Время для пенальти уже наступило(если penalty=0, то второй случай
+            # автоматически проверится)
+            cur_datetime = datetime(year=week_date.year, month=week_date.month, day=week_date.day,
                                     hour=cur_dict['lesson_start'].hour,
-                                    minute=cur_dict['lesson_start'].minute):
+                                    minute=cur_dict['lesson_start'].minute)
+            if [cur_dict['lesson_start'], cur_dict['lesson_end']] in list_busy:  # or \
+                # now >= cur_datetime - timedelta(hours=penalty_time):
                 continue
 
             slots[page_slots].append(cur_dict)
@@ -102,7 +112,7 @@ def create_delete_time_student(lessons_busy):
             page_slots += 1
         slots[page_slots].append(lesson)
         record += 1
-    #pprint(slots, indent=4)
+    # pprint(slots, indent=4)
     return slots
 
 
@@ -141,9 +151,9 @@ def give_result_status_timeinterval(information_of_status_lesson):
 
 def give_result_info(result_status):
     if result_status:
-        return '✅ Оплата принята ✅'
+        return LEXICON_ALL['payed_right']
     else:
-        return '❌ Ожидается оплата ❌'
+        return LEXICON_ALL['payed_not_right']
 
 
 ############################################## УЧИТЕЛЬ #########################################3
@@ -155,13 +165,14 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
                 'lesson_off': -1,
                 'student_id': -1,
                 'list_status': []}
-    # start, end = 0, 0
-    # Случай, когда ученик не выбрал уроков вообще
+
     for interval in list_lessons_not_formatted:
+        # print(interval.work_start, interval.work_end)
+        # Случай, когда ученик не выбрал уроков вообще
         if not interval.lessons:
             cur_empty = {'lesson_on': interval.work_start,
                          'lesson_off': interval.work_end,
-                         'student_id': -1,
+                         'student_id': None,
                          'list_status': [-1]}
             empty_lessons.append(cur_empty)
         if interval.lessons:
@@ -238,13 +249,82 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
                 cur_buttons.append(
                     {'lesson_on': start,
                      'lesson_off': end,
-                     'student_id': -1,
+                     'student_id': None,
                      'list_status': [-1]})
                 start = lesson['lesson_on']
                 end = lesson['lesson_off']
         cur_buttons.append(
             {'lesson_on': start,
              'lesson_off': end,
-             'student_id': -1,
+             'student_id': None,
              'list_status': [-1]})
+    elif not cur_buttons and empty_lessons:
+        # Добавляем в начало пустой промежуток:
+        cur_buttons.insert(0, empty_lessons[0])
     return cur_buttons
+
+
+def count_time_to_penalty_not_format(week_date: date,
+                                     lesson_on: time,
+                                     penalty: int):
+    cur_dt = datetime(year=week_date.year,
+                      month=week_date.month,
+                      day=week_date.day,
+                      hour=lesson_on.hour,
+                      minute=lesson_on.minute)
+
+    time_difference = (cur_dt - datetime.now()
+                       - timedelta(hours=penalty)).total_seconds()
+    return time_difference
+
+
+# Получаем информацию об уроке в зависимости от системы пенальти
+def give_text_information_lesson(student: Student,
+                                 week_date: date,
+                                 lesson_on: time,
+                                 lesson_off: time,
+                                 information_of_status_lesson):
+    # Смотрим, что со статусом
+    result_status, counter_lessons = give_result_status_timeinterval(information_of_status_lesson)
+    status_info = give_result_info(result_status)
+
+    # Проверяем, есть установлен ли режим пенальти
+    if student.teacher.penalty:
+        # Количество секунд до занятия
+        count_time_to_penalty = count_time_to_penalty_not_format(week_date,
+                                                                 lesson_on,
+                                                                 student.teacher.penalty)
+        # Если <= 0 -> уже наступило
+        if count_time_to_penalty <= 0:
+            text_penalty = LEXICON_STUDENT['text_penalty_expired']
+        # Если > 0 -> выводим время до пенальти
+        else:
+            text_penalty = (LEXICON_STUDENT['text_penalty_not_expired']
+                            .format(time(hour=int(count_time_to_penalty // 3600),
+                                         minute=int(count_time_to_penalty // 60 % 60)
+                                         ).
+                                    strftime("%H:%M")
+                                    )
+                            )
+        # Формирует текст об ученике
+        text = LEXICON_STUDENT['information_about_lesson_penalty'].format(
+            student.teacher.surname, student.teacher.name, lesson_on.strftime("%H:%M"),
+            lesson_off.strftime("%H:%M"),
+            student.teacher.phone, student.teacher.bank, student.price * counter_lessons / 2,
+            text_penalty, status_info
+        )
+    else:
+        # Случай, когда система пенальти не установлена
+        text = LEXICON_STUDENT['information_about_lesson'].format(
+            student.teacher.surname, student.teacher.name, lesson_on.strftime("%H:%M"),
+            lesson_off.strftime("%H:%M"),
+            student.teacher.phone, student.teacher.bank, student.price * counter_lessons / 2,
+            status_info)
+
+    return text
+
+
+def course_class_choose(class_learning,
+                        course_learning):
+    return f'{class_learning} класс' if class_learning \
+        else f'{course_learning} класс'
