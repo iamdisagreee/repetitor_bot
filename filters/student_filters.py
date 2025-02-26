@@ -22,8 +22,8 @@ class StudentStartFilter(BaseFilter):
     async def __call__(self, callback: CallbackQuery,
                        available_students):
         result = callback.from_user.id in available_students
-        if not result:
-            await callback.answer()
+        # if not result:
+        #     await callback.answer()
         return result
 
 
@@ -101,15 +101,16 @@ class IsTeacherDidSlots(BaseFilter):
         week_date = give_date_format_fsm(state_dict['week_date'])
         student = await give_teacher_id_by_student_id(session,
                                                       callback.from_user.id)
-
-        result = await session.execute(
-            select(LessonWeek)
-            .where(
-                and_(LessonWeek.week_date == week_date,
-                     LessonWeek.teacher_id == student.teacher_id)
+        if student is not None:
+            result = await session.execute(
+                select(LessonWeek)
+                .where(
+                    and_(LessonWeek.week_date == week_date,
+                         LessonWeek.teacher_id == student.teacher_id)
+                )
             )
-        )
-        return result.scalar()
+            return result.scalar()
+        return []
 
 
 # Проверяем, есть ли свободные слоты

@@ -18,6 +18,7 @@ from sqlalchemy.orm import mapped_column, Mapped, DeclarativeBase
 from aiogram.fsm.storage.redis import RedisStorage
 from handlers import teacher_handlers, everyone_handlers, student_handlers
 from keyboards.everyone_kb import set_new_menu
+from lexicon import other_handlers
 from middlewares.outer import DbSessionMiddleware
 from apscheduler.schedulers.background import BackgroundScheduler
 
@@ -61,7 +62,7 @@ async def main():
     dp.include_router(everyone_handlers.router)
     dp.include_router(student_handlers.router)
     dp.include_router(teacher_handlers.router)
-
+    dp.include_router(other_handlers.router)
     dp.update.outer_middleware(DbSessionMiddleware(session_maker))
 
     # Удаление по расписанию (раз в 3 дня)!

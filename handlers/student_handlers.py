@@ -195,6 +195,8 @@ async def process_price_sent(message: Message, session: AsyncSession, state: FSM
     await state.update_data(price=message.text)
 
     student_form = await state.get_data()
+    # Добавляем ученика в бд и проверяем, поменял ли он репетитора
+    # Если да, то чистим все его записи
     await command_add_students(session,
                                message.from_user.id,
                                **student_form)
@@ -653,7 +655,8 @@ async def process_delete_profile(callback: CallbackQuery, session: AsyncSession)
 
 
 ######################################## Кнопка ШТРАФЫ #############################################
-@router.callback_query(F.data == 'penalties', IsTeacherDidSystemPenalties(), IsStudentHasPenalties())
+@router.callback_query(F.data == 'penalties', IsTeacherDidSystemPenalties(), IsStudentHasPenalties(),
+                       )
 async def process_penalties(callback: CallbackQuery, session: AsyncSession):
     student_penalties = await give_students_penalty(session, callback.from_user.id)
 
@@ -678,9 +681,3 @@ async def process_not_work_penalties(callback: CallbackQuery):
 @router.callback_query(F.data == 'penalties', ~IsStudentHasPenalties())
 async def process_not_penalties(callback: CallbackQuery):
     await callback.answer(LEXICON_STUDENT['has_not_penalty'])
-
-
-# Ввели что-то не то
-# @router.message()
-# async def process_incorrect_input(message: Message):
-#     await message.answer(text=LEXICON_ALL['incorrect_input'])

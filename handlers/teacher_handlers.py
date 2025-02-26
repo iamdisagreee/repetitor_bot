@@ -27,7 +27,7 @@ from filters.teacher_filters import IsTeacherInDatabase, \
     IsNoConflictWithStart, IsNoConflictWithEnd, IsLessonWeekInDatabaseState, \
     IsSomethingToShowSchedule, \
     IsPhoneCorrectInput, IsBankCorrectInput, IsPenaltyCorrectInput, IsInputTimeLongerThanNow, \
-    IsNewDayNotNear, TeacherStartFilter, IsSomethingToPay, IsPenalty
+    IsNewDayNotNear, TeacherStartFilter, IsSomethingToPay, IsPenalty, IsNotTeacherAdd, IsHasTeacherStudents
 from fsm.fsm_teacher import FSMRegistrationTeacherForm, FSMRegistrationLessonWeek, FSMAddStudentToStudy
 from keyboards.everyone_kb import create_start_kb
 from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb, create_authorization_kb, \
@@ -51,7 +51,7 @@ router.callback_query.filter(TeacherStartFilter())
 
 
 ############################### Логика входа в меню идентификации #######################################
-@router.callback_query(F.data == 'teacher_entrance')  # IsTeacherInAccess())
+@router.callback_query(F.data == 'teacher_entrance')
 async def process_entrance(callback: CallbackQuery):
     teacher_entrance_kb = create_entrance_kb()
     await callback.message.edit_text(text=LEXICON_TEACHER['menu_identification'],
@@ -153,7 +153,7 @@ async def process_wrong_phone_sent(message: Message):
 # Случай, когда учитель уже зарегистрирован, но нажал на кнопку регистрации!
 @router.callback_query(F.data == 'reg_teacher', IsTeacherInDatabase())
 async def process_not_start_registration(callback: CallbackQuery):
-    await callback.answer(text=LEXICON_TEACHER['now_registered'], show_alert=True)
+    await callback.answer(text=LEXICON_TEACHER['now_registered'])
 
 
 # Случай, когда учитель не зарегистрирован, но нажал на кнопку авторизации!
@@ -640,7 +640,7 @@ async def process_management_students(callback: CallbackQuery):
 
 
 ############################### Список добавленных студентов и их статус: '🔒'/ '🔑' #############################
-@router.callback_query(F.data == 'list_add_students')
+@router.callback_query(F.data == 'list_add_students', IsHasTeacherStudents())
 async def process_list_add_students(callback: CallbackQuery,
                                     session: AsyncSession):
     list_students = await give_all_students_by_teacher(session,
@@ -669,6 +669,12 @@ async def process_change_status_entry_student(callback: CallbackQuery, session: 
                                      reply_markup=create_list_add_students_kb(list_students))
 
 
+# Случай, когда у учителя нет зарегистрированных учеников
+@router.callback_query(F.data == 'list_add_students', ~IsHasTeacherStudents())
+async def process_list_not_add_students(callback: CallbackQuery):
+    await callback.answer(LEXICON_TEACHER['has_not_students'])
+
+
 ############## Кнопка редактировать (тут можно удалять) ################
 @router.callback_query(F.data == 'delete_student_by_teacher')
 async def process_show_delete_student_by_teacher(callback: CallbackQuery, session: AsyncSession):
@@ -693,15 +699,15 @@ async def process_show_delete_student_by_teacher(callback: CallbackQuery, sessio
 
 
 ######################################### Кнопка добавить ученика ####################################3
-@router.callback_query(F.data == 'allow_student')
+@router.callback_query(F.data == 'allow_student', StateFilter(default_state))
 async def process_add_student_to_study(callback: CallbackQuery, state: FSMContext):
     await callback.message.edit_text(text=LEXICON_TEACHER['input_student_id'])
     await state.set_state(FSMAddStudentToStudy.fill_id)
 
 
 # Ловим введенный айдишник!
-@router.message(StateFilter(FSMAddStudentToStudy.fill_id), F.text.isdigit())
-async def process_id_sent(message: Message, session: AsyncSession, state: FSMContext):
+@router.message(StateFilter(FSMAddStudentToStudy.fill_id), F.text.isdigit(), IsNotTeacherAdd())
+async def process_not_digit_id_sent(message: Message, session: AsyncSession, state: FSMContext):
     await add_student_id_in_database(session,
                                      int(message.text)
                                      )
@@ -710,9 +716,16 @@ async def process_id_sent(message: Message, session: AsyncSession, state: FSMCon
                          reply_markup=create_back_to_management_students_kb())
 
 
+# Неправильный формат айди!
 @router.message(StateFilter(FSMAddStudentToStudy.fill_id), ~F.text.isdigit())
 async def process_id_not_sent(message: Message):
-    await message.answer(LEXICON_TEACHER['not_success_added'])
+    await message.answer(LEXICON_TEACHER['not_success_added_id'])
+
+
+# Введенный айди это айди учителя!
+@router.message(StateFilter(FSMAddStudentToStudy.fill_id), ~IsNotTeacherAdd())
+async def process_teacher_sent(message: Message):
+    await message.answer(LEXICON_TEACHER['not_success_added_teacher'])
 
 
 ################################ Кнопка __Список должников__ #################################################
@@ -735,9 +748,3 @@ async def process_show_list_debtors(callback: CallbackQuery):
 @router.callback_query(PlugPenaltyTeacherCallbackFactory.filter())
 async def process_show_list_debtors_plug(callback):
     await callback.answer()
-
-
-# Ввели что-то не то
-# @router.callback_query()
-# async def process_incorrect_input(message: Message):
-#     await message.answer(text=LEXICON_ALL['incorrect_input'])

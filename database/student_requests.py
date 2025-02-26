@@ -1,7 +1,7 @@
 from datetime import datetime, date, time
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, delete
 from sqlalchemy.orm import selectinload
 
 from database import Student, LessonDay
@@ -12,7 +12,10 @@ from database.models.teacher import Teacher
 
 # Получаем список всех учителей
 async def command_get_all_teachers(session: AsyncSession):
-    result = await session.execute(select(Teacher))
+    result = await session.execute(
+        select(Teacher)
+        .order_by(Teacher.surname)
+    )
 
     return result.scalars()
 
@@ -41,6 +44,16 @@ async def command_add_students(session: AsyncSession,
                       teacher_id=int(teacher_id),
                       price=int(price)
                       )
+    # Получаем teacher_id, если он есть. И сравниваем с добавляемым
+    # Если он изменился, то чистим все занятия
+    # last_teacher_id = (await session.execute(
+    #     select(Teacher.teacher_id)
+    #     .where(Student.student_id == student_id)
+    # )).scalar()
+    # if last_teacher_id is not None:
+    #     if last_teacher_id != int(teacher_id):
+    #         stmt = (delete(LessonWeek).where(LessonWeek.teacher_id == int(teacher_id)))
+    #         await session.execute(stmt)
 
     await session.merge(student)
     await session.commit()
@@ -222,7 +235,6 @@ async def delete_student_profile(session: AsyncSession,
 
 async def give_students_penalty(session: AsyncSession,
                                 student_id: int):
-
     student_penalties = await session.execute(
         select(Penalty)
         .where(Penalty.student_id == student_id)

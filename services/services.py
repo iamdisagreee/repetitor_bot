@@ -238,8 +238,12 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
                 )
             last_one = interval_result
 
+    # Последний промежуток пустой, но уже есть занятия
+    if cur_buttons and len(empty_lessons) == 1:
+        cur_buttons.append(empty_lessons[-1])
+
     # Ни одного занятого места
-    if not cur_buttons:
+    if not cur_buttons and empty_lessons:
         start = empty_lessons[0]['lesson_on']
         end = empty_lessons[0]['lesson_off']
         for lesson in empty_lessons[1:]:
@@ -264,6 +268,7 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
     return cur_buttons
 
 
+# Время до пенальти
 def count_time_to_penalty_not_format(week_date: date,
                                      lesson_on: time,
                                      penalty: int):
@@ -276,6 +281,17 @@ def count_time_to_penalty_not_format(week_date: date,
     time_difference = (cur_dt - datetime.now()
                        - timedelta(hours=penalty)).total_seconds()
     return time_difference
+
+
+# Возвращаем время до пенальти в нужном для нас формате
+def give_my_penalty_format(count_time_to_penalty):
+    hour = int(count_time_to_penalty // 3600)
+    minute = int(count_time_to_penalty // 60 % 60)
+    if hour < 10:
+        hour = '0' + str(hour)
+    if minute < 10:
+        minute = '0'+str(minute)
+    return f'{hour}:{minute}'
 
 
 # Получаем информацию об уроке в зависимости от системы пенальти
@@ -300,11 +316,7 @@ def give_text_information_lesson(student: Student,
         # Если > 0 -> выводим время до пенальти
         else:
             text_penalty = (LEXICON_STUDENT['text_penalty_not_expired']
-                            .format(time(hour=int(count_time_to_penalty // 3600),
-                                         minute=int(count_time_to_penalty // 60 % 60)
-                                         ).
-                                    strftime("%H:%M")
-                                    )
+                            .format(give_my_penalty_format(count_time_to_penalty))
                             )
         # Формирует текст об ученике
         text = LEXICON_STUDENT['information_about_lesson_penalty'].format(

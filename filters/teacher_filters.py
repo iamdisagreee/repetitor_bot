@@ -21,8 +21,8 @@ class TeacherStartFilter(BaseFilter):
     async def __call__(self, callback: CallbackQuery,
                        available_teachers):
         result = callback.from_user.id in available_teachers
-        if not result:
-            await callback.answer(text='Нет доступа!')
+        # if not result:
+        #     await callback.answer(text='Нет доступа!')
         return result
 
 
@@ -228,7 +228,12 @@ class IsSomethingToShowSchedule(BaseFilter):
 
         result = await session.execute(
             select(LessonWeek.week_id)
-            .where(LessonWeek.week_date == week_date)
+            .where(
+                and_(
+                    LessonWeek.week_date == week_date,
+                    LessonWeek.teacher_id == callback.from_user.id
+                )
+            )
         )
 
         return result.scalar()
@@ -242,7 +247,12 @@ class IsSomethingToPay(BaseFilter):
 
         result = await session.execute(
             select(LessonDay.lesson_id)
-            .where(LessonDay.week_date == week_date)
+            .where(
+                and_(
+                    LessonDay.week_date == week_date,
+                    LessonDay.teacher_id == callback.from_user.id
+                )
+            )
         )
 
         return result.scalar()
@@ -257,3 +267,25 @@ class IsPenalty(BaseFilter):
         )
 
         return is_penalty.scalar()
+
+
+class IsNotTeacherAdd(BaseFilter):
+
+    async def __call__(self, message: Message,
+                       session: AsyncSession):
+        teachers_access = await session.execute(
+            select(AccessTeacher.teacher_id)
+        )
+        teachers_access_list = teachers_access.scalars().all()
+        return int(message.text) not in teachers_access_list
+
+
+class IsHasTeacherStudents(BaseFilter):
+
+    async def __call__(self, callback: CallbackQuery, session: AsyncSession):
+        has_students = await session.execute(
+            select(Student)
+            .where(Student.teacher_id == callback.from_user.id)
+        )
+
+        return has_students.scalar()
