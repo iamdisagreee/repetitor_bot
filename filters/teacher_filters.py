@@ -6,12 +6,13 @@ from aiogram.types import Message, CallbackQuery
 from aiogram.filters import BaseFilter
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, delete
+from sqlalchemy.orm import selectinload
 
 from callback_factory.teacher_factories import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory
 from database import Teacher, LessonWeek, LessonDay, Student, AccessTeacher
 from database.models import Penalty
 from database.teacher_requests import give_installed_lessons_week, give_penalty_by_teacher_id, \
-    give_student_by_teacher_id
+    give_student_by_teacher_id, give_all_lessons_day_by_week_day
 from services.services import give_list_with_days, give_date_format_callback, give_date_format_fsm, give_time_format_fsm
 
 
@@ -94,7 +95,9 @@ class IsNewDayNotNear(BaseFilter):
 
 
 # Проверка, что время старта - время __пенальти__ > текущего времени
-class IsCorrectTimeInputWithPenalty(BaseFilter):
+# И если это не так, то отправляем время до пенальти, выбранное время
+# НО МЫ ВСЕ ИНВЕРСИРУЕМ, ЧТОБЫ ПРИ НЕПРАВИЛЬНОМ ВРЕМЕНИ ПОЛУЧИТЬ ДАННЫЕ
+class IsIncorrectTimeInputWithPenalty(BaseFilter):
     async def __call__(self, message: Message, state: FSMContext,
                        session: AsyncSession):
         week_date_str = (await state.get_data())['week_date']
@@ -107,7 +110,12 @@ class IsCorrectTimeInputWithPenalty(BaseFilter):
                           day=week_date.day,
                           hour=time_put.hour,
                           minute=time_put.minute)
-        return datetime.now() + timedelta(hours=penalty) < dt_put
+        # if datetime.now() + timedelta(hours=penalty) < dt_put:
+        if datetime.now() + timedelta(hours=penalty) >= dt_put:
+            return {'dt_to_penalty': dt_put - timedelta(hours=penalty),
+                    'dt_put': dt_put,
+                    'time_penalty': penalty}
+        return False
 
 
 # Проверяем, что вводимое время больше текущего (по дню сравниванием также)
@@ -123,17 +131,17 @@ class IsInputTimeLongerThanNow(BaseFilter):
                                           minute=time_add.minute)
 
 
-# Фильтр проверяет, что время старта не конфликтует с уже добавленным
-class IsNoConflictWithStart(BaseFilter):
+# Фильтр проверяет, что время старта конфликтует с уже добавленным
+class IsConflictWithStart(BaseFilter):
     async def __call__(self, message: Message, session: AsyncSession, state: FSMContext):
         time_start = give_time_format_fsm(message.text)
 
         date_start_str = (await state.get_data())['week_date']
         date_start = give_date_format_fsm(date_start_str)
 
-        res_time = await give_installed_lessons_week(session,
-                                                     message.from_user.id,
-                                                     date_start)
+        res_time = (await give_installed_lessons_week(session,
+                                                      message.from_user.id,
+                                                      date_start)).all()
 
         if res_time:
             for one_date in res_time:
@@ -142,12 +150,13 @@ class IsNoConflictWithStart(BaseFilter):
 
                 if one_date.work_start <= time_start < one_date.work_end or \
                         delta_db > delta_cur and delta_db - delta_cur < timedelta(minutes=30):
-                    return False
-        return True
+                    return {'res_time': res_time}
+        # False - нет конфликта
+        return False
 
 
-# Проверяем, что время_окончания - время_старта >= 30 минут
-class IsDifferenceThirtyMinutes(BaseFilter):
+# Проверяем, что время_окончания - время_старта < 30 минут
+class IsDifferenceLessThirtyMinutes(BaseFilter):
     async def __call__(self, message: Message, state: FSMContext):
         lesson_day_form = await state.get_data()
 
@@ -157,42 +166,49 @@ class IsDifferenceThirtyMinutes(BaseFilter):
         delta_start = timedelta(hours=work_start.hour, minutes=work_start.minute)
         delta_end = timedelta(hours=work_end.hour, minutes=work_end.minute)
 
-        return delta_end - delta_start >= timedelta(minutes=30)
+        if delta_end - delta_start < timedelta(minutes=30):
+            return {'work_start': work_start}
+        return False
 
 
-# Фильтр проверяет, что время старта < время_окончания
-class IsNoEndBiggerStart(BaseFilter):
+# Фильтр указывает выполняется ли время старта >= время_окончания
+class IsEndBiggerStart(BaseFilter):
     async def __call__(self, message: Message, state: FSMContext):
         lesson_day_form = await state.get_data()
 
         work_start = give_time_format_fsm(lesson_day_form['work_start'])
         work_end = give_time_format_fsm(message.text)
 
-        return (timedelta(hours=work_end.hour, minutes=work_end.minute) >
-                timedelta(hours=work_start.hour, minutes=work_start.minute))
+        # Время конца <= время старта
+        if (timedelta(hours=work_end.hour, minutes=work_end.minute) <=
+                timedelta(hours=work_start.hour, minutes=work_start.minute)):
+            return {'work_start': work_start}
+        else:
+            return False
 
 
-# Проверка, что время окончания не лежит в уже существующем промежутке
-class IsNoConflictWithEnd(BaseFilter):
+# Проверка, что время окончания лежит в уже существующем промежутке
+class IsConflictWithEnd(BaseFilter):
     async def __call__(self, message: Message, session: AsyncSession, state: FSMContext):
+        lesson_day_form = await state.get_data()
+
+        time_start = give_time_format_fsm(lesson_day_form['work_start'])
         time_end = give_time_format_fsm(message.text)
+        week_date = give_date_format_fsm(lesson_day_form['week_date'])
 
-        time_start_str = (await state.get_data())['work_start']
-        time_start = give_time_format_fsm(time_start_str)
-
-        date_end_str = (await state.get_data())['week_date']
-        date_end = give_date_format_fsm(date_end_str)
-
-        res_time = await give_installed_lessons_week(session,
-                                                     message.from_user.id,
-                                                     date_end)
+        res_time = (await give_installed_lessons_week(session,
+                                                      message.from_user.id,
+                                                      week_date)
+                    ).all()
 
         if res_time:
             for one_date in res_time:
                 if one_date.work_start < time_end <= one_date.work_end or \
                         time_start < one_date.work_start and time_end > one_date.work_end:
-                    return False
-        return True
+                    return {'work_start': time_start,
+                            'work_end': time_end,
+                            'res_time': res_time}
+        return False
 
 
 class IsRemoveNameRight(BaseFilter):
@@ -200,7 +216,7 @@ class IsRemoveNameRight(BaseFilter):
         return callback.data[:-1] == 'del_record_teacher_' and callback.data[-1].isdigit()
 
 
-class IsLessonWeekInDatabaseState(BaseFilter):
+class IsLessonWeekInDatabase(BaseFilter):
     async def __call__(self, callback: CallbackQuery, session: AsyncSession, state: FSMContext):
         week_date_str = (await state.get_data())['week_date']
         week_date = give_date_format_fsm(week_date_str)
@@ -215,9 +231,11 @@ class IsLessonWeekInDatabaseState(BaseFilter):
             )
         )
 
-        result = await session.execute(stmt)
+        result = (await session.execute(stmt)).scalar()
 
-        return result.scalar()
+        if result:
+            return {'week_date': week_date}
+        return False
 
 
 class IsSomethingToShowSchedule(BaseFilter):
@@ -226,17 +244,16 @@ class IsSomethingToShowSchedule(BaseFilter):
         week_date_str = callback_data.week_date
         week_date = give_date_format_fsm(week_date_str)
 
-        result = await session.execute(
-            select(LessonWeek.week_id)
-            .where(
-                and_(
-                    LessonWeek.week_date == week_date,
-                    LessonWeek.teacher_id == callback.from_user.id
-                )
-            )
-        )
+        result = await give_all_lessons_day_by_week_day(session,
+                                                        callback.from_user.id,
+                                                        week_date)
 
-        return result.scalar()
+        found_lessons_week = result.all()
+
+        if found_lessons_week:
+            return {'list_lessons_not_formatted': found_lessons_week,
+                    'week_date_str': week_date_str}
+        return False
 
 
 class IsSomethingToPay(BaseFilter):
@@ -255,7 +272,9 @@ class IsSomethingToPay(BaseFilter):
             )
         )
 
-        return result.scalar()
+        if result.scalar():
+            return {'week_date_str': week_date_str,
+                    'week_date': week_date}
 
 
 class IsPenalty(BaseFilter):
@@ -283,9 +302,13 @@ class IsNotTeacherAdd(BaseFilter):
 class IsHasTeacherStudents(BaseFilter):
 
     async def __call__(self, callback: CallbackQuery, session: AsyncSession):
-        has_students = await session.execute(
+        has_students = (await session.execute(
             select(Student)
             .where(Student.teacher_id == callback.from_user.id)
+            .options(selectinload(Student.access))
         )
+                        ).scalars()
 
-        return has_students.scalar()
+        if has_students:
+            return {'list_students': has_students}
+        return False

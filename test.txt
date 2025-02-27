@@ -1,0 +1,2 @@
+            end_time = time.perf_counter()
+            print(f"Функция выполнилась за {end_time - start_time:.4f} секунд")

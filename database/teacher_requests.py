@@ -1,10 +1,11 @@
 from datetime import datetime, date, time
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_
+from sqlalchemy import select, and_, delete
 from sqlalchemy.orm import selectinload
 
 from database import LessonDay, Student, AccessStudent
+from database.models import Penalty
 from database.models.lesson_week import LessonWeek
 from database.models.teacher import Teacher
 
@@ -133,6 +134,27 @@ async def give_student_by_student_id(session: AsyncSession,
     return result.scalar()
 
 
+async def give_status_pay_student(session: AsyncSession,
+                                  student_id: int,
+                                  week_date: date,
+                                  lesson_on: time,
+                                  lesson_off: time
+                                  ):
+    lesson_days = await session.execute(
+        select(LessonDay.status)
+        .where(
+            and_(
+                LessonDay.student_id == student_id,
+                LessonDay.week_date == week_date,
+                LessonDay.lesson_start >= lesson_on,
+            )
+        )
+        # .order_by(LessonDay.lesson_start)
+    )
+
+    return lesson_days.scalar()
+
+
 async def change_status_pay_student(session: AsyncSession,
                                     student_id: int,
                                     week_date: date,
@@ -232,24 +254,6 @@ async def give_teacher_profile_by_teacher_id(session: AsyncSession,
     return profile.scalar()
 
 
-async def give_student_id_by_teacher_id(session: AsyncSession,
-                                        teacher_id,
-                                        week_date,
-                                        lesson_on):
-    student_id = await session.execute(
-        select(LessonDay.student_id)
-        .where(
-            and_(
-                LessonDay.week_date == week_date,
-                LessonDay.teacher_id == teacher_id,
-                LessonDay.lesson_start == lesson_on
-            )
-        )
-    )
-
-    return student_id.scalar()
-
-
 async def give_penalty_by_teacher_id(session: AsyncSession,
                                      teacher_id: int):
     result = await session.execute(
@@ -287,7 +291,7 @@ async def change_status_entry_student(session: AsyncSession,
     await session.commit()
 
 
-# Получаем статус ученика
+# Получаем статус доступа ученика
 async def give_status_entry_student(session: AsyncSession,
                                     student_id: int):
     student_status = (
@@ -343,8 +347,10 @@ async def give_student_by_teacher_id(session: AsyncSession,
                                      teacher_id,
                                      week_date,
                                      lesson_on):
-    student_id = (await session.execute(
-        select(LessonDay.student_id)
+    student = await session.execute(
+        select(Student)
+        .join(LessonDay, Student.student_id ==
+              LessonDay.student_id)
         .where(
             and_(
                 LessonDay.week_date == week_date,
@@ -352,28 +358,51 @@ async def give_student_by_teacher_id(session: AsyncSession,
                 LessonDay.lesson_start == lesson_on
             )
         )
-    )).scalar()
-
-    student = await session.execute(
-        select(Student)
-        .where(Student.student_id == student_id)
         .options(
             selectinload(Student.access),
-            selectinload(Student.penalties)
+            selectinload(Student.penalties),
+            selectinload(Student.teacher),
         )
     )
-
     return student.scalar()
 
 
-# Удаляем все занятия ученика, если его забанили
+# Удаляем все занятия ученика
 async def delete_all_lessons_student(session: AsyncSession,
                                      student_id: int):
-    result = await session.execute(
-        select(LessonDay)
-        .where(LessonDay.student_id == student_id)
-    )
 
-    for student in result.scalars():
-        await session.delete(student)
+    to_delete_lesson_day = (delete(LessonDay)
+                            .where(Student.student_id == student_id))
+    await session.execute(to_delete_lesson_day)
+    await session.commit()
+
+
+async def delete_all_penalties_student(session: AsyncSession,
+                                       student_id: int):
+    to_delete_penalty = (delete(Penalty)
+                         .where(Student.student_id == student_id))
+
+    await session.execute(to_delete_penalty)
+    await session.commit()
+
+
+async def add_penalty_to_student(session: AsyncSession,
+                                 student_id: int,
+                                 week_date,
+                                 lesson_on,
+                                 lesson_off):
+    penalty = Penalty(student_id=student_id,
+                      week_date=week_date,
+                      lesson_on=lesson_on,
+                      lesson_off=lesson_off)
+
+    session.add(penalty)
+    await session.commit()
+
+
+async def delete_penalty_of_student(session: AsyncSession,
+                                    student_id: int):
+    stmt = delete(Penalty).where(Penalty.student_id == student_id)
+
+    await session.execute(stmt)
     await session.commit()

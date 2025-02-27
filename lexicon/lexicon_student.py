@@ -51,7 +51,7 @@ LEXICON_STUDENT = {
     'back': '<<',
     'go_menu_identification': 'Перейти в меню идентификации',
     'show_schedule': 'Мое расписание',
-    'settings_schedule': 'Настройки расписания',
+    'settings_schedule': 'Запись на занятия',
     'penalties': 'Пенальти',
     'settings_student': 'Настройки профиля',
     'main_menu_authorization': '👑👑👑<b>ГЛАВНОЕ МЕНЮ</b>👑👑👑\n\n'

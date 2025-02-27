@@ -125,7 +125,7 @@ def create_all_records_week_day(weeks_day):
                   for week_day in weeks_day
               ] + [
                   [InlineKeyboardButton(
-                      text='<назад',
+                      text=LEXICON_TEACHER['back'],
                       callback_data='schedule_teacher'
                   )]
               ]
@@ -210,7 +210,7 @@ def show_next_seven_days_schedule_teacher_kb(*days):
                   )
                   ]
                   for cur_date in days
-              ] + [[InlineKeyboardButton(text='<назад',
+              ] + [[InlineKeyboardButton(text=LEXICON_TEACHER['back'],
                                          callback_data='auth_teacher')]]
 
     next_seven_days_with_cur_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
@@ -274,7 +274,7 @@ def back_to_show_or_delete_schedule_teacher(week_date_str,
                                   lesson_off=lesson_off
                               ).pack()
                               )],
-        [InlineKeyboardButton(text='<назад',
+        [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
                               callback_data=ShowDaysOfScheduleTeacherCallbackFactory(
                                   week_date=week_date_str
                               ).pack()

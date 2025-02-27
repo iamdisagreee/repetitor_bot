@@ -69,6 +69,9 @@ async def main():
     # scheduler = AsyncIOScheduler()
     # scheduler.add_job(delete_old_records, 'interval', days=3, args=(session_maker,))  # Runs daily
     # scheduler.start()
+    # await bot.send_message(chat_id=822208465,text='Бу! Испугался?\n'
+    #                                               'Не бойся! Это я - твой друг!\n'
+    #                                               'Щавель или персик?')
 
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(bot)

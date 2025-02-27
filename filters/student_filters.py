@@ -1,3 +1,4 @@
+import time
 from datetime import timedelta, datetime
 
 from aiogram.fsm.context import FSMContext
@@ -11,7 +12,7 @@ from callback_factory.student_factories import ShowDaysOfScheduleCallbackFactory
 from database import Student, LessonWeek, LessonDay
 from database.models import Penalty
 from database.student_requests import give_lessons_week_for_day, give_all_busy_time_intervals, \
-    give_teacher_id_by_student_id, give_all_lessons_for_day
+    give_teacher_by_student_id, give_all_lessons_for_day
 from services.services import give_list_with_days, give_date_format_fsm, create_choose_time_student, \
     create_delete_time_student, give_time_format_fsm
 
@@ -68,9 +69,10 @@ class IsMoveRightAddMenu(BaseFilter):
         week_date_str = state_dict['week_date']
         week_date = give_date_format_fsm(week_date_str)
 
-        student = await give_teacher_id_by_student_id(session,
-                                                      callback.from_user.id)
-        lessons_week = await give_lessons_week_for_day(session, week_date, student.teacher_id)
+        student = await give_teacher_by_student_id(session,
+                                                   callback.from_user.id)
+        lessons_week = await give_lessons_week_for_day(session, week_date,
+                                                       student.teacher_id)
 
         lessons_busy = await give_all_busy_time_intervals(session,
                                                           student.teacher_id,
@@ -79,18 +81,24 @@ class IsMoveRightAddMenu(BaseFilter):
         dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date,
                                                   student.teacher.penalty)
 
-        page = 0
+        page_count = 0
         for day, times in dict_lessons.items():
             if not times:
-                page = day
+                page_count = day
                 break
 
-        return (await state.get_data())['page'] + 1 < page
+        page_now = state_dict['page']
+        print(page_now, page_count)
+        if page_now + 1 < page_count:
+            return {'dict_lessons': dict_lessons,
+                    'student': student,
+                    'week_date_str': week_date_str,
+                    'page': page_now}
+        return False
 
 
 class IsMoveLeftMenu(BaseFilter):
     async def __call__(self, callback: CallbackQuery, state: FSMContext, session: AsyncSession):
-        # print('DAY_LEFT', (await state.get_data())['page'])
         return (await state.get_data())['page'] - 1 >= 1
 
 
@@ -98,19 +106,26 @@ class IsMoveLeftMenu(BaseFilter):
 class IsTeacherDidSlots(BaseFilter):
     async def __call__(self, callback: CallbackQuery, session: AsyncSession, state: FSMContext):
         state_dict = await state.get_data()
+        week_date_str = state_dict['week_date']
         week_date = give_date_format_fsm(state_dict['week_date'])
-        student = await give_teacher_id_by_student_id(session,
-                                                      callback.from_user.id)
+        student = await give_teacher_by_student_id(session,
+                                                   callback.from_user.id)
         if student is not None:
-            result = await session.execute(
-                select(LessonWeek)
-                .where(
-                    and_(LessonWeek.week_date == week_date,
-                         LessonWeek.teacher_id == student.teacher_id)
+            create_slots = (
+                await session.execute(
+                    select(LessonWeek)
+                    .where(
+                        and_(LessonWeek.week_date == week_date,
+                             LessonWeek.teacher_id == student.teacher_id)
+                    )
                 )
-            )
-            return result.scalar()
-        return []
+            ).scalar()
+            if create_slots:
+                return {'week_date_str': week_date_str,
+                        'student': student,
+                        'page': state_dict['page']
+                        }
+        return False
 
 
 # Проверяем, есть ли свободные слоты
@@ -118,8 +133,8 @@ class IsFreeSlots(BaseFilter):
     async def __call__(self, callback: CallbackQuery, session: AsyncSession, state: FSMContext):
         state_dict = await state.get_data()
         week_date = give_date_format_fsm(state_dict['week_date'])
-        student = await give_teacher_id_by_student_id(session,
-                                                      callback.from_user.id)
+        student = await give_teacher_by_student_id(session,
+                                                   callback.from_user.id)
 
         lessons_busy = await give_all_busy_time_intervals(session,
                                                           student.teacher_id,
@@ -128,7 +143,10 @@ class IsFreeSlots(BaseFilter):
         lessons_week = await give_lessons_week_for_day(session, week_date, student.teacher_id)
         dict_lessons = create_choose_time_student(lessons_week, lessons_busy, week_date,
                                                   student.teacher.penalty)
-        return sum(bool(value) for value in dict_lessons.values()) != 0
+
+        if sum(bool(value) for value in dict_lessons.values()) != 0:
+            return {'dict_lessons': dict_lessons}
+        return False
 
 
 class IsStudentChooseSlots(BaseFilter):
@@ -197,14 +215,12 @@ class IsTimeNotExpired(BaseFilter):
         cur_date = datetime.now().date()
         penalty_delta = timedelta(hours=student.teacher.penalty)
         lesson_start = give_time_format_fsm(callback_data.lesson_start)
-        cur_datetime = datetime(year=cur_date.year,
-                                month=cur_date.month,
-                                day=cur_date.day,
-                                hour=lesson_start.hour,
-                                minute=lesson_start.minute)
-        now_datetime = datetime.now()
-
-        return now_datetime > cur_datetime - penalty_delta
+        choose_datetime = datetime(year=cur_date.year,
+                                   month=cur_date.month,
+                                   day=cur_date.day,
+                                   hour=lesson_start.hour,
+                                   minute=lesson_start.minute)
+        return datetime.now() + penalty_delta < choose_datetime
 
 
 # Фильтр отвечает за то, установил учитель систему пенальти или нет (подгружаем teacher для ученика)

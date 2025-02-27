@@ -78,7 +78,7 @@ async def give_lessons_week_for_day(session: AsyncSession,
 # Получаем список существующих записей на заданный день
 async def give_all_busy_time_intervals(session: AsyncSession,
                                        teacher_id: int,
-                                       week_date: int):
+                                       week_date: date):
     result = await session.execute(
         select(LessonDay)
         .where(
@@ -113,11 +113,12 @@ async def add_lesson_day(session: AsyncSession,
     await session.commit()
 
 
-async def give_teacher_id_by_student_id(session: AsyncSession,
-                                        student_id: int):
-    student = await session.execute(select(Student)
-                                    .where(Student.student_id == student_id)
-                                    .options(selectinload(Student.teacher)))
+async def give_teacher_by_student_id(session: AsyncSession,
+                                     student_id: int):
+    student = await session.execute(
+        select(Student)
+        .where(Student.student_id == student_id)
+        .options(selectinload(Student.teacher)))
 
     return student.scalar()
 
