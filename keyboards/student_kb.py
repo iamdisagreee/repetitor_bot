@@ -159,7 +159,8 @@ def create_delete_lessons_menu(dict_for_6_lessons,
             text=f'{lesson.lesson_start.strftime("%H:%M")} - {lesson.lesson_finished.strftime("%H:%M")}',
             callback_data=DeleteFieldCallbackFactory(
                 lesson_start=lesson.lesson_start.strftime("%H:%M"),
-                lesson_finished=lesson.lesson_finished.strftime("%H:%M")
+                lesson_finished=lesson.lesson_finished.strftime("%H:%M"),
+                week_date=week_date_str
             )
         )
         counter_buttons += 1

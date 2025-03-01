@@ -10,6 +10,7 @@ __all__ = [
     "teacher",
     "student",
     "lesson_day",
+    "penalties",
     "lesson_week",
     "access_teacher",
     "access_student"

@@ -12,7 +12,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
     StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory
-from database import Student
+from database import Student, LessonDay
 from database.student_requests import command_get_all_teachers, command_add_students, give_lessons_week_for_day, \
     add_lesson_day, give_teacher_by_student_id, give_all_busy_time_intervals, \
     give_all_lessons_for_day, remove_lesson_day, give_week_id_by_teacher_id, \
@@ -410,20 +410,17 @@ async def process_not_add_time_study(callback: CallbackQuery):
 ###################################### Кнопка УДАЛИТЬ ###########################################
 
 @router.callback_query(F.data == 'remove_gap_student', IsStudentChooseSlots())
-async def process_remove_time_study(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
-    state_dict = await state.get_data()
-    week_date_str = state_dict['week_date']
-    week_date = give_date_format_fsm(week_date_str)
-    page = state_dict['page']
+async def process_remove_time_study(callback: CallbackQuery,
+                                     week_date_str: str, page: int,
+                                     all_busy_lessons: list[LessonDay]):
 
-    all_busy_lessons = await give_all_lessons_for_day(session,
-                                                      week_date,
-                                                      callback.from_user.id)
     dict_for_6_lessons = create_delete_time_student(all_busy_lessons)
     await callback.message.edit_text(text=LEXICON_STUDENT['delete_slot'],
-                                     reply_markup=create_delete_lessons_menu(dict_for_6_lessons,
-                                                                             week_date_str,
-                                                                             page))
+                                     reply_markup=create_delete_lessons_menu(
+                                        dict_for_6_lessons,
+                                        week_date_str,
+                                        page)
+                                    )
 
 
 # Настраиваем удаление записей по нажатию на кнопку! + Ограничение по удалению не наступило!
@@ -477,21 +474,17 @@ async def process_move_right_remove(callback: CallbackQuery, session: AsyncSessi
 
 # Движение вправо в меню удаления
 @router.callback_query(F.data == 'move_right_remove', IsMoveRightRemoveMenu())
-async def process_move_left_remove(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
-    state_dict = await state.get_data()
-    week_date_str = state_dict['week_date']
-    week_date = give_date_format_fsm(week_date_str)
-    page = state_dict['page'] + 1
-    await state.update_data(page=page)
+async def process_move_left_remove(callback: CallbackQuery, session: AsyncSession,
+                                   state: FSMContext,
+                                   week_date_str: str,
+                                   dict_for_6_lessons,
+                                   page: int):
+    await state.update_data(page=page+1)
 
-    all_busy_lessons = await give_all_lessons_for_day(session,
-                                                      week_date,
-                                                      callback.from_user.id)
-    dict_for_6_lessons = create_delete_time_student(all_busy_lessons)
     await callback.message.edit_text(text=LEXICON_STUDENT['delete_slot'],
                                      reply_markup=create_delete_lessons_menu(dict_for_6_lessons,
                                                                              week_date_str,
-                                                                             page))
+                                                                             page+1))
 
 
 # Случай, при нажатии на кнопку __удалить__ нечего удалять
@@ -539,20 +532,17 @@ async def process_show_schedule(callback: CallbackQuery, state: FSMContext):
 @router.callback_query(ShowDaysOfScheduleCallbackFactory.filter(), IsLessonsInChoseDay())
 async def process_show_lessons_for_day(callback: CallbackQuery, session: AsyncSession,
                                        callback_data: ShowDaysOfScheduleCallbackFactory,
-                                       state: FSMContext):
-    week_date = give_date_format_fsm(callback_data.week_date)
+                                       state: FSMContext,
+                                       all_lessons_for_day_not_ordered: list[LessonDay]):
     await state.update_data(week_date=callback_data.week_date)
 
-    all_lessons_for_day_not_ordered = await give_all_lessons_for_day(session,
-                                                                     week_date,
-                                                                     callback.from_user.id)
     all_lessons_for_day_ordered_list = show_all_lessons_for_day(all_lessons_for_day_not_ordered)
 
     await callback.message.edit_text(text=LEXICON_STUDENT['schedule_lesson_day'],
                                      reply_markup=all_lessons_for_day_kb(all_lessons_for_day_ordered_list)
                                      )
 
-
+#Нечего смотреть в выбранном дне
 @router.callback_query(ShowDaysOfScheduleCallbackFactory.filter(), ~IsLessonsInChoseDay())
 async def process_not_show_lessons_for_day(callback: CallbackQuery):
     await callback.answer(LEXICON_STUDENT['not_choose_gaps'])

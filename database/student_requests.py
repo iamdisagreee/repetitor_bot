@@ -145,21 +145,7 @@ async def give_all_lessons_for_day(session: AsyncSession,
                                    week_date: date,
                                    student_id: int):
     now = datetime.now()
-    # cur_time = now.time()
-    # cur_date = now.date()
-
-    # if cur_date == week_date:
-    #     all_lessons_for_day = await session.execute(
-    #         select(LessonDay)
-    #         .where(
-    #             and_(
-    #                 LessonDay.student_id == student_id,
-    #                 LessonDay.week_date == week_date,
-    #                 LessonDay.lesson_start > cur_time
-    #             )
-    #         ).order_by(LessonDay.lesson_start)
-    #     )
-    # else:
+ 
     all_lessons_for_day = await session.execute(
         select(LessonDay)
         .where(

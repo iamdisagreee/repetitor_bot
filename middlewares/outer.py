@@ -1,4 +1,3 @@
-from pprint import pprint
 from typing import Callable, Dict, Any, Awaitable
 
 from aiogram import BaseMiddleware
@@ -7,6 +6,8 @@ from sqlalchemy import select
 from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from database import AccessTeacher, AccessStudent
+from database.base import Base
+from database.models.penalties import Penalty
 
 
 # Открываем сессию
@@ -31,27 +32,3 @@ class DbSessionMiddleware(BaseMiddleware):
             data["session"] = session
             return await handler(event, data)
 
-
-# class IsAccessTeacherMiddleware(BaseMiddleware):
-#     async def __call__(self,
-#                        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-#                        event: TelegramObject,
-#                        data: Dict[str, Any]):
-#         print('t ',event.from_user.id in data['available_teachers'])
-#         if event.from_user.id in data['available_teachers']:
-#             return await handler(event, data)
-#         else:
-#             await event.answer("Нет доступа!")
-
-
-# class IsAccessUserMiddleware(BaseMiddleware):
-#     async def __call__(self,
-#                        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
-#                        event: TelegramObject,
-#                        data: Dict[str, Any]):
-#         #print('s ', event.from_user.id, data['available_students'])
-#         if event.from_user.id in data['available_students']:
-#             return await handler(event, data)
-#         elif event.from_user.id in data['available_teachers']:
-#             return await handler(event, data)
-#         await event.answer("Нет доступа!")

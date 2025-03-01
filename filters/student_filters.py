@@ -154,16 +154,17 @@ class IsStudentChooseSlots(BaseFilter):
     async def __call__(self, callback: CallbackQuery, session: AsyncSession, state: FSMContext):
         state_dict = await state.get_data()
         week_date = give_date_format_fsm(state_dict['week_date'])
-        result = await session.execute(
-            select(LessonDay)
-            .where(
-                and_(
-                    LessonDay.student_id == callback.from_user.id,
-                    LessonDay.week_date == week_date
-                )
-            )
-        )
-        return result.scalar()
+        all_lessons_for_day = (await give_all_lessons_for_day(session,
+                                                week_date,
+                                                callback.from_user.id)
+                                                ).all()
+        if all_lessons_for_day:
+            return {'week_date_str': state_dict['week_date'],
+                    'page': state_dict['page'],
+                    'all_busy_lessons': all_lessons_for_day}
+                    
+        return False
+        
 
 
 class IsMoveRightRemoveMenu(BaseFilter):
@@ -183,7 +184,12 @@ class IsMoveRightRemoveMenu(BaseFilter):
                 day_page = day
                 break
 
-        return state_dict['page'] + 1 < day_page
+        if state_dict['page'] + 1 < day_page:
+            return {
+                    'week_date_str': week_date_str,
+                    'dict_for_6_lessons': dict_for_6_lessons,
+                    'page': state_dict['page']}
+        return False
 
 
 class IsLessonsInChoseDay(BaseFilter):
@@ -191,11 +197,17 @@ class IsLessonsInChoseDay(BaseFilter):
                        callback_data: ShowDaysOfScheduleCallbackFactory):
         week_date = give_date_format_fsm(callback_data.week_date)
 
-        all_lessons_for_day_not_ordered = await give_all_lessons_for_day(session,
-                                                                         week_date,
-                                                                         callback.from_user.id)
+        all_lessons_for_day_not_ordered = (
+            await give_all_lessons_for_day(session,
+                                            week_date,
+                                            callback.from_user.id
+                                            )
+                                        ).all()
 
-        return all_lessons_for_day_not_ordered.first()
+        if all_lessons_for_day_not_ordered:
+            return {'all_lessons_for_day_not_ordered': all_lessons_for_day_not_ordered,
+                    'week_date': week_date}
+        return F
 
 
 # Проверка на то, что время удаления слота еще не истекло! - Иначе удалить никак!!
@@ -211,16 +223,17 @@ class IsTimeNotExpired(BaseFilter):
 
         if student.teacher.penalty == 0:
             return True
-
-        cur_date = datetime.now().date()
+        
+        week_date = give_date_format_fsm(callback_data.week_date)
         penalty_delta = timedelta(hours=student.teacher.penalty)
         lesson_start = give_time_format_fsm(callback_data.lesson_start)
-        choose_datetime = datetime(year=cur_date.year,
-                                   month=cur_date.month,
-                                   day=cur_date.day,
+        choose_datetime = datetime(year=week_date.year,
+                                   month=week_date.month,
+                                   day=week_date.day,
                                    hour=lesson_start.hour,
                                    minute=lesson_start.minute)
-        return datetime.now() + penalty_delta < choose_datetime
+        print('now: ', datetime.now(),'will: ', choose_datetime - penalty_delta)
+        return datetime.now() < choose_datetime - penalty_delta
 
 
 # Фильтр отвечает за то, установил учитель систему пенальти или нет (подгружаем teacher для ученика)

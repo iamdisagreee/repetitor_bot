@@ -6,7 +6,7 @@ from aiogram.client.default import DefaultBotProperties
 from aiogram.enums import ParseMode
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker, AsyncSession
-from sqlalchemy import text, select
+from sqlalchemy import text, select, inspect
 from config_data.config import load_config
 from database import LessonWeek
 from database.base import Base
@@ -42,12 +42,17 @@ async def main():
 
     storage = RedisStorage.from_url(config.tgbot.redis)
 
+    # print("МОИ МОДЕЛИ")
+    # for table_name in Base.metadata.tables.keys():
+    #     print(table_name)
     # async with engine.begin() as session:
     #     await session.execute(text('SELECT 1'))
 
     # async with engine.begin() as connection:
-    #     await connection.run_sync(Base.metadata.drop_all)
-    #     await connection.run_sync(Base.metadata.create_all)
+    #      await connection.run_sync(Base.metadata.drop_all)
+    #      print("Удалил")
+    #      await connection.run_sync(Base.metadata.create_all)
+    #      print("Создал")
 
     bot = Bot(token=config.tgbot.token,
               default=DefaultBotProperties(parse_mode=ParseMode.HTML))
@@ -74,6 +79,7 @@ async def main():
     #                                               'Щавель или персик?')
 
     await bot.delete_webhook(drop_pending_updates=True)
+    print("START POLLING...")
     await dp.start_polling(bot)
 
 

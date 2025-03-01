@@ -40,7 +40,7 @@ class Student(Base):
     lessons: Mapped[list["lesson_day.LessonDay"]] = relationship(back_populates='student',
                                                                  cascade='delete')
 
-    penalties: Mapped[list["penalties.Penalty"]] = relationship(back_populates='student',
+    penalties: Mapped[list["penalties.Penalty"]] = relationship('Penalty', back_populates='student',
                                                                 cascade='delete')
 
     access: Mapped["access_student.AccessStudent"] = relationship(back_populates='student')

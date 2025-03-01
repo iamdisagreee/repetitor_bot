@@ -4,12 +4,14 @@ from .models.lesson_week import LessonWeek
 from .models.lesson_day import LessonDay
 from .models.access_student import AccessStudent
 from .models.access_teacher import AccessTeacher
+from .models.penalties import Penalty
 
 __all__ = [
     "Teacher",
     "Student",
     "LessonWeek",
     "LessonDay",
+    "Penalty",
     "AccessStudent",
-    "AccessTeacher"
+    "AccessTeacher",
 ]

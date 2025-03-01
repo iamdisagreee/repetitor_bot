@@ -9,15 +9,15 @@ from . import student
 
 
 class Penalty(Base):
-
     __tablename__ = 'penalties'
+
     penalty_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True,
                                              server_default=text("gen_random_uuid()"))
 
     student_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('students.student_id',
                                                                    ondelete='cascade'))
-    week_date: Mapped[date] = mapped_column(Date())
-    lesson_on: Mapped[time] = mapped_column(Time())
-    lesson_off: Mapped[time] = mapped_column(Time())
+    week_date: Mapped[date] = mapped_column(Date)
+    lesson_on: Mapped[time] = mapped_column(Time)
+    lesson_off: Mapped[time] = mapped_column(Time)
 
-    student: Mapped["student.Student"] = relationship(back_populates='penalties')
+    student: Mapped["student.Student"] = relationship('Student', back_populates='penalties')

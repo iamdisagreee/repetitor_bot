@@ -14,9 +14,10 @@ class EmptyAddFieldCallbackFactory(CallbackData, prefix='plug'):
     plug: str
 
 
-class DeleteFieldCallbackFactory(CallbackData, prefix='delete', sep='-'):
+class DeleteFieldCallbackFactory(CallbackData, prefix='delete', sep=';'):
     lesson_start: str
     lesson_finished: str
+    week_date: str
 
 
 class EmptyRemoveFieldCallbackFactory(CallbackData, prefix='plug'):
