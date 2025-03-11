@@ -44,3 +44,9 @@ class DeleteDayScheduleCallbackFactory(CallbackData, prefix='delete_day', sep='&
 
 class PlugPenaltyTeacherCallbackFactory(CallbackData, prefix='plug'):
     plug: str
+
+class SentMessagePaymentStudentCallbackFactory(CallbackData, prefix='sent',  sep=';'):
+    student_id: int
+    week_date: str
+    lesson_on: str
+    lesson_off: str

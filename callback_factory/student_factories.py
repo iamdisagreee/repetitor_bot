@@ -1,5 +1,6 @@
 # Фабрика коллбеков (существующую кнопки)
 from datetime import time
+from sys import prefix
 
 from aiogram.filters.callback_data import CallbackData
 
@@ -47,3 +48,12 @@ class DeleteStudentToStudyCallbackFactory(CallbackData, prefix='delete_student')
 
 class PlugPenaltyStudentCallbackFactory(CallbackData, prefix='plug'):
     plug: str
+
+class InformationLessonCallbackFactory(CallbackData, prefix='lesson', sep=';'):
+    name: str
+    surname: str
+    subject: str
+    week_date: str
+    lesson_on: str
+    lesson_off: str
+    full_price: int

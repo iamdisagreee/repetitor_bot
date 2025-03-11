@@ -10,7 +10,7 @@ from database.base import Base
 from database.models.penalties import Penalty
 
 
-# Открываем сессию
+# Открываем сессию для SQLAlchemy
 class DbSessionMiddleware(BaseMiddleware):
     def __init__(self, session_pool: async_sessionmaker):
         self.session_pool = session_pool

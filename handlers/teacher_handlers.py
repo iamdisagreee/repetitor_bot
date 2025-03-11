@@ -1,20 +1,24 @@
 import asyncio
-from datetime import datetime, timedelta, date, time
+from datetime import datetime, timedelta, date, time, timezone
 
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
 from aiogram.fsm.state import StatesGroup, State, default_state
 from sqlalchemy import delete, select
 from sqlalchemy.ext.asyncio import AsyncSession
-
+from taskiq_nats import NATSKeyValueScheduleSource
+from taskiq import Context, TaskiqDepends, ScheduledTask
+import time as t
 from callback_factory.student_factories import ChangeStatusOfAddListCallbackFactory, DeleteStudentToStudyCallbackFactory
 from callback_factory.teacher_factories import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
-    DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory, PlugScheduleLessonWeekDayBackFactory
-from database import Student, LessonDay, LessonWeek
+    DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory, PlugScheduleLessonWeekDayBackFactory, \
+    SentMessagePaymentStudentCallbackFactory
+from database import Student, LessonDay, LessonWeek, AccessStudent
 from database.models import Penalty
+from database.taskiq_requests import give_scheduled_payment_verification_teachers
 from database.teacher_requests import command_add_teacher, command_add_lesson_week, give_installed_lessons_week, \
     delete_week_day, give_all_lessons_day_by_week_day, change_status_pay_student, \
     give_information_of_one_lesson, delete_lesson, delete_teacher_profile, \
@@ -40,9 +44,11 @@ from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb,
     create_back_to_management_students_kb, create_list_delete_students_kb, show_list_of_debtors_kb, back_to_settings_kb
 from lexicon.lexicon_all import LEXICON_ALL
 from lexicon.lexicon_teacher import LEXICON_TEACHER
+from main import worker
 from services.services import give_list_with_days, give_time_format_fsm, give_date_format_fsm, \
     give_list_registrations_str, show_intermediate_information_lesson_day_status, give_result_info, COUNT_BAN, \
     course_class_choose
+from services.services_taskiq import give_available_ids
 
 # Ученик - ничего не происходит
 # Преподаватель - открываем
@@ -166,7 +172,13 @@ async def process_not_start_authorization(callback: CallbackQuery):
 
 ###################################### Зашли в профиль репетитора #######################################
 @router.callback_query(F.data == 'auth_teacher', IsTeacherInDatabase())
-async def process_start_authorization(callback: CallbackQuery):
+async def process_start_authorization(callback: CallbackQuery, session: AsyncSession,
+                                      scheduler_storage: NATSKeyValueScheduleSource):
+    await give_scheduled_payment_verification_teachers(session)
+    # Логика настройки проверки оплаты в 23:50 по мск
+    # available_ids = await give_available_ids(
+    #     scheduler_storage)  # set(map(lambda x: x.schedule_id, await scheduler_storage.get_schedules()))
+    # if f's_p_v_{callback.from_user.id}' not in available_ids:
     await callback.message.edit_text(text=LEXICON_TEACHER['main_menu_authorization'],
                                      reply_markup=create_authorization_kb())
 
@@ -202,7 +214,7 @@ async def process_create_day_schedule(callback: CallbackQuery, state: FSMContext
 # Ловим время __Старта__ , запрашиваем время __Окончания__ занятий
 @router.message(StateFilter(FSMRegistrationLessonWeek.fill_work_start), IsCorrectFormatTime(),
                 IsNewDayNotNear(), IsInputTimeLongerThanNow(),
-                ~IsConflictWithStart()) #~IsIncorrectTimeInputWithPenalty())
+                ~IsConflictWithStart())  # ~IsIncorrectTimeInputWithPenalty())
 async def process_time_start_sent(message: Message, state: FSMContext):
     await state.update_data(work_start=message.text)
 
@@ -469,6 +481,26 @@ async def process_not_show_status_student(callback: CallbackQuery):
     await callback.answer(LEXICON_TEACHER['nobody_choose_lessons'])
 
 
+####################### Кнопка __ПОДТВЕРДИТЬ__ при запросе о подтверждении ############################
+@router.callback_query(SentMessagePaymentStudentCallbackFactory.filter())
+async def process_change_status_payment_message(callback: CallbackQuery, session: AsyncSession,
+                                                callback_data: SentMessagePaymentStudentCallbackFactory,
+                                                bot: Bot
+                                                ):
+    week_date = give_date_format_fsm(callback_data.week_date)
+    lesson_on = give_time_format_fsm(callback_data.lesson_on)
+    lesson_off = give_time_format_fsm(callback_data.lesson_off)
+
+    await change_status_pay_student(session,
+                                    callback_data.student_id,
+                                    week_date,
+                                    lesson_on,
+                                    lesson_off)
+
+    await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
+
+
+
 ########################################## кнопка МОЕ РАСПИСАНИЕ ######################################
 @router.callback_query(F.data == 'schedule_show')
 async def process_show_my_schedule(callback: CallbackQuery):
@@ -608,7 +640,6 @@ async def process_management_students(callback: CallbackQuery):
 @router.callback_query(F.data == 'list_add_students', IsHasTeacherStudents())
 async def process_list_add_students(callback: CallbackQuery,
                                     list_students: list[Student]):
-
     await callback.message.edit_text(text=LEXICON_TEACHER['teacher_students'],
                                      reply_markup=create_list_add_students_kb(list_students))
 

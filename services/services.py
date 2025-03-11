@@ -299,9 +299,10 @@ def give_text_information_lesson(student: Student,
                                  week_date: date,
                                  lesson_on: time,
                                  lesson_off: time,
-                                 information_of_status_lesson):
+                                 result_status,
+                                 counter_lessons):
+
     # Смотрим, что со статусом
-    result_status, counter_lessons = give_result_status_timeinterval(information_of_status_lesson)
     status_info = give_result_info(result_status)
 
     # Проверяем, есть установлен ли режим пенальти

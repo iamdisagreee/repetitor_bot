@@ -8,7 +8,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_
 from sqlalchemy.orm import selectinload
 
-from callback_factory.student_factories import ShowDaysOfScheduleCallbackFactory, DeleteFieldCallbackFactory
+from callback_factory.student_factories import ShowDaysOfScheduleCallbackFactory, DeleteFieldCallbackFactory, \
+    InformationLessonCallbackFactory
 from database import Student, LessonWeek, LessonDay
 from database.models import Penalty
 from database.student_requests import give_lessons_week_for_day, give_all_busy_time_intervals, \
@@ -207,7 +208,7 @@ class IsLessonsInChoseDay(BaseFilter):
         if all_lessons_for_day_not_ordered:
             return {'all_lessons_for_day_not_ordered': all_lessons_for_day_not_ordered,
                     'week_date': week_date}
-        return F
+        return False
 
 
 # Проверка на то, что время удаления слота еще не истекло! - Иначе удалить никак!!
@@ -232,21 +233,45 @@ class IsTimeNotExpired(BaseFilter):
                                    day=week_date.day,
                                    hour=lesson_start.hour,
                                    minute=lesson_start.minute)
-        print('now: ', datetime.now(),'will: ', choose_datetime - penalty_delta)
+        # print('now: ', datetime.now(),'will: ', choose_datetime - penalty_delta)
         return datetime.now() < choose_datetime - penalty_delta
 
+
+#Подтверждена уже оплата или нет
+#Если нет, то отправляем teacher_id для дальнейшей работы
+class IsNotAlreadyConfirmed(BaseFilter):
+    async def __call__(self, callback: CallbackQuery, session: AsyncSession,
+                       callback_data:InformationLessonCallbackFactory):
+        week_date = give_date_format_fsm(callback_data.week_date)
+        lesson_on = give_time_format_fsm(callback_data.lesson_on)
+        result = await session.execute(
+            select(LessonDay)
+            .where(
+                and_(
+                    LessonDay.student_id == callback.from_user.id,
+                    LessonDay.week_date == week_date,
+                    LessonDay.lesson_start == lesson_on
+                )
+            )
+        )
+        lesson = result.scalar()
+        if not lesson.status:
+            return {'teacher_id': lesson.teacher_id}
+        return False
 
 # Фильтр отвечает за то, установил учитель систему пенальти или нет (подгружаем teacher для ученика)
 class IsTeacherDidSystemPenalties(BaseFilter):
     async def __call__(self, callback: CallbackQuery, session: AsyncSession):
-        student = await session.execute(
+        student = (
+            await session.execute(
             select(Student)
             .where(
                 Student.student_id == callback.from_user.id
             )
             .options(selectinload(Student.teacher))
-        )
-        return student.scalar().teacher.penalty
+            )
+        ).scalar()
+        return student.teacher.penalty
 
 
 # Проверяем, есть ли у студента пенальти

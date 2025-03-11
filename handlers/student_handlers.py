@@ -1,17 +1,18 @@
 import time
 from datetime import datetime, date
 
-from aiogram import Router, F
+from aiogram import Router, F, Bot
 from aiogram.filters import StateFilter
 
 from aiogram.fsm.state import StatesGroup, State, default_state
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
+from taskiq_nats import NATSKeyValueScheduleSource
 
 from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
-    StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory
+    StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory, InformationLessonCallbackFactory
 from database import Student, LessonDay
 from database.student_requests import command_get_all_teachers, command_add_students, give_lessons_week_for_day, \
     add_lesson_day, give_teacher_by_student_id, give_all_busy_time_intervals, \
@@ -20,7 +21,8 @@ from database.student_requests import command_get_all_teachers, command_add_stud
 from filters.student_filters import IsStudentInDatabase, IsInputFieldAlpha, \
     FindNextSevenDaysFromKeyboard, IsMoveRightAddMenu, IsMoveLeftMenu, IsTeacherDidSlots, IsStudentChooseSlots, \
     IsMoveRightRemoveMenu, IsLessonsInChoseDay, IsTimeNotExpired, IsFreeSlots, IsTeacherDidSystemPenalties, \
-    IsStudentHasPenalties, StudentStartFilter, IsRightClassCourse, IsRightPrice
+    IsStudentHasPenalties, StudentStartFilter, IsRightClassCourse, IsRightPrice, \
+    IsNotAlreadyConfirmed
 from fsm.fsm_student import FSMRegistrationStudentForm
 from keyboards.everyone_kb import create_start_kb
 from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, create_level_choice_kb, \
@@ -28,11 +30,13 @@ from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, 
     create_choose_time_student_kb, create_delete_lessons_menu, show_next_seven_days_schedule_kb, all_lessons_for_day_kb, \
     create_button_for_back_to_all_lessons_day, create_settings_profile_kb, create_information_penalties, \
     create_back_to_settings_student_kb
+from keyboards.taskiq_kb import create_confirm_payment_teacher_kb
 from lexicon.lexicon_all import LEXICON_ALL
 from lexicon.lexicon_student import LEXICON_STUDENT
+from lexicon.lexicon_taskiq import LEXICON_TASKIQ
 from services.services import give_list_with_days, create_choose_time_student, give_date_format_fsm, \
     give_time_format_fsm, create_delete_time_student, show_all_lessons_for_day, \
-    give_text_information_lesson, course_class_choose, COUNT_BAN
+    give_text_information_lesson, course_class_choose, COUNT_BAN, give_result_status_timeinterval, NUMERIC_DATE
 
 # Преподаватель - нет доступа
 # Ученик - открываем
@@ -568,18 +572,49 @@ async def process_show_full_information_lesson(callback: CallbackQuery, session:
                                                                     lesson_on,
                                                                     lesson_off)
 
+    #Общая информация для определения статуса оплаты и общей суммы занятия
+    result_status, counter_lessons = give_result_status_timeinterval(information_of_status_lesson)
+
     # Получаем информацию об уроке в зависимости от системы пенальти
     text_information_lesson = give_text_information_lesson(student,
                                                            week_date,
                                                            lesson_on,
                                                            lesson_off,
-                                                           information_of_status_lesson)
+                                                           result_status,
+                                                           counter_lessons)
 
     # Выводим информацию
     await callback.message.edit_text(text=text_information_lesson,
-                                     reply_markup=create_button_for_back_to_all_lessons_day(week_date_str)
+                                     reply_markup=create_button_for_back_to_all_lessons_day(week_date_str,
+                                                                                            student,
+                                                                                            callback_data.lesson_on,
+                                                                                            callback_data.lesson_off,
+                                                                                            counter_lessons)
                                      )
 
+#Отправляем сообщение преподавателю с ожиданием подтверждения оплаты
+@router.callback_query(InformationLessonCallbackFactory.filter(), IsNotAlreadyConfirmed())
+async def process_sent_student_payment_confirmation(callback: CallbackQuery, teacher_id: int, bot: Bot,
+                                                    callback_data: InformationLessonCallbackFactory):
+    week_date = give_date_format_fsm(callback_data.week_date)
+    await bot.send_message(chat_id=teacher_id,
+                           text=LEXICON_TASKIQ['sent_student_payment_confirmation']
+                           .format(callback_data.name, callback_data.surname,
+                                   callback_data.subject, week_date.strftime("%d.%m"),
+                                   NUMERIC_DATE[date(year=week_date.year,
+                                                     month=week_date.month,
+                                                     day=week_date.day).isoweekday()],
+                                   callback_data.lesson_on, callback_data.lesson_off,
+                                   callback_data.full_price),
+                           reply_markup=create_confirm_payment_teacher_kb(callback.from_user.id,
+                                                                          callback_data)
+                           )
+    await callback.answer(text=LEXICON_STUDENT['student_payment_confirmation_good'])
+
+#Случай, когда оплата уже подтверждена
+@router.callback_query(InformationLessonCallbackFactory.filter(), ~IsNotAlreadyConfirmed())
+async def process_not_sent_student_payment_confirmation(callback: CallbackQuery):
+    await callback.answer(text=LEXICON_STUDENT['already_confirm_lesson'])
 
 ###################################### Кнопка НАСТРОЙКИ #############################################
 
@@ -623,7 +658,7 @@ async def process_delete_profile(callback: CallbackQuery, session: AsyncSession)
                                      reply_markup=create_start_kb())
 
 
-######################################## Кнопка ШТРАФЫ #############################################
+######################################## Кнопка ПЕНАЛЬТИ #############################################
 @router.callback_query(F.data == 'penalties', IsTeacherDidSystemPenalties(), IsStudentHasPenalties(),
                        )
 async def process_penalties(callback: CallbackQuery, session: AsyncSession):

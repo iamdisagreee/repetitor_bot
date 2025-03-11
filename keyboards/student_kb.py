@@ -5,7 +5,7 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
-    StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory
+    StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory, InformationLessonCallbackFactory
 from lexicon.lexicon_student import LEXICON_STUDENT
 from services.services import NUMERIC_DATE
 
@@ -229,12 +229,29 @@ def all_lessons_for_day_kb(lessons):
     return builder.as_markup()
 
 
-def create_button_for_back_to_all_lessons_day(week_date):
+def create_button_for_back_to_all_lessons_day(week_date_str,
+                                              student,
+                                              lesson_on,
+                                              lesson_off,
+                                              counter_lessons
+                                              ):
     button_for_back_to_all_lessons_day = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text='<назад',
+            [InlineKeyboardButton(text=LEXICON_STUDENT['confirm_lesson'],
+                                  callback_data=InformationLessonCallbackFactory(
+                                      name=student.name,
+                                      surname=student.surname,
+                                      subject=student.subject,
+                                      week_date=week_date_str,
+                                      lesson_on=lesson_on,
+                                      lesson_off=lesson_off,
+                                      full_price=student.price * counter_lessons / 2
+                                  ).pack()
+                                  )
+             ],
+            [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
                                   callback_data=ShowDaysOfScheduleCallbackFactory(
-                                      week_date=week_date
+                                      week_date=week_date_str
                                   ).pack()
                                   )
              ]
