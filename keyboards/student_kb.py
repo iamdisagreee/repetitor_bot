@@ -6,7 +6,9 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
     StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory, InformationLessonCallbackFactory
+from callback_factory.teacher_factories import SentMessagePaymentStudentCallbackFactory
 from lexicon.lexicon_student import LEXICON_STUDENT
+from lexicon.lexicon_teacher import LEXICON_TEACHER
 from services.services import NUMERIC_DATE
 
 
@@ -299,3 +301,22 @@ def create_information_penalties(student_penalties):
     information_penalties_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
 
     return information_penalties_kb
+
+
+def create_confirm_payment_teacher_kb(student_id: int,
+                                      callback_data: InformationLessonCallbackFactory):
+    confirm_payment_teacher_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text=LEXICON_STUDENT['confirm_payment_student'],
+                callback_data=SentMessagePaymentStudentCallbackFactory(
+                    student_id=student_id,
+                    week_date=callback_data.week_date,
+                    lesson_on=callback_data.lesson_on,
+                    lesson_off=callback_data.lesson_off
+                ).pack()
+            )]
+        ]
+    )
+
+    return confirm_payment_teacher_kb

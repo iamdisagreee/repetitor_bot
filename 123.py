@@ -1,15 +1,13 @@
-a = iter([1, 2, 3, 4, 5])
+from datetime import datetime, time, timedelta
 
-count = 0
-while True:
-    try:
-        for el in a:
-            input()
-            count += 1
-            print(el)
-            if count == 2:
-                raise Exception('exception is now!')
-        break
-    except Exception as e:
-        print('aue')
-        # break
+my_dict = {'a': [1, 2, 3]}
+
+print(my_dict['a'] + [4])
+
+
+a = time(hour=13, minute=12)
+b = time(12, 11)
+td = (timedelta(hours=a.hour, minutes=a.minute) - timedelta(hours=b.hour, minutes=b.minute)).total_seconds()
+# print(f'{int(td // 3600)} ч. {int(td // 60 % 60)} мин.')
+
+print(0+timedelta(minutes=1))

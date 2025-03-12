@@ -5,6 +5,7 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.fsm.state import StatesGroup, State, default_state
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
+from database.taskiq_requests import give_information_for_day
 from keyboards.everyone_kb import create_start_kb
 from lexicon.lexicon_all import LEXICON_ALL
 
@@ -13,10 +14,11 @@ router = Router()
 
 @router.message(CommandStart())
 async def process_start_using_bot(message: Message, state: FSMContext,
+                                  session: AsyncSession
                                   ):
     await message.answer(text=LEXICON_ALL['start'],
                          reply_markup=create_start_kb())
-
+    await give_information_for_day(session)
     await state.clear()
 
 

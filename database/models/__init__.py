@@ -13,5 +13,6 @@ __all__ = [
     "penalties",
     "lesson_week",
     "access_teacher",
-    "access_student"
+    "access_student",
+    "debtor"
 ]

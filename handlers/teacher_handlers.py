@@ -41,13 +41,14 @@ from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb,
     show_next_seven_days_pay_kb, show_status_lesson_day_kb, show_next_seven_days_schedule_teacher_kb, \
     show_schedule_lesson_day_kb, back_to_show_schedule_teacher, back_to_show_or_delete_schedule_teacher, \
     settings_teacher_kb, create_management_students_kb, create_list_add_students_kb, \
-    create_back_to_management_students_kb, create_list_delete_students_kb, show_list_of_debtors_kb, back_to_settings_kb
+    create_back_to_management_students_kb, create_list_delete_students_kb, show_list_of_debtors_kb, back_to_settings_kb, \
+    create_notification_confirmation_student_kb
 from lexicon.lexicon_all import LEXICON_ALL
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from main import worker
 from services.services import give_list_with_days, give_time_format_fsm, give_date_format_fsm, \
     give_list_registrations_str, show_intermediate_information_lesson_day_status, give_result_info, COUNT_BAN, \
-    course_class_choose
+    course_class_choose, NUMERIC_DATE
 from services.services_taskiq import give_available_ids
 
 # Ученик - ничего не происходит
@@ -496,10 +497,21 @@ async def process_change_status_payment_message(callback: CallbackQuery, session
                                     week_date,
                                     lesson_on,
                                     lesson_off)
-
+    #Удаляем сообщение преподавателя
     await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
 
-
+    #Отправляем сообщение в чат ученику
+    await bot.send_message(chat_id=callback_data.student_id,
+                           text=LEXICON_TEACHER['success_lesson_paid']
+                           .format(week_date.strftime("%d.%m"),
+                                   NUMERIC_DATE[date(year=week_date.year,
+                                                     month=week_date.month,
+                                                     day=week_date.day).isoweekday()],
+                                   callback_data.lesson_on,
+                                   callback_data.lesson_off
+                                   ),
+                           reply_markup=create_notification_confirmation_student_kb()
+                           )
 
 ########################################## кнопка МОЕ РАСПИСАНИЕ ######################################
 @router.callback_query(F.data == 'schedule_show')

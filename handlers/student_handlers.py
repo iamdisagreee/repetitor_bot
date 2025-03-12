@@ -29,11 +29,9 @@ from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, 
     create_back_to_entrance_kb, create_authorization_kb, show_next_seven_days_settings_kb, create_menu_add_remove_kb, \
     create_choose_time_student_kb, create_delete_lessons_menu, show_next_seven_days_schedule_kb, all_lessons_for_day_kb, \
     create_button_for_back_to_all_lessons_day, create_settings_profile_kb, create_information_penalties, \
-    create_back_to_settings_student_kb
-from keyboards.taskiq_kb import create_confirm_payment_teacher_kb
+    create_back_to_settings_student_kb, create_confirm_payment_teacher_kb
 from lexicon.lexicon_all import LEXICON_ALL
 from lexicon.lexicon_student import LEXICON_STUDENT
-from lexicon.lexicon_taskiq import LEXICON_TASKIQ
 from services.services import give_list_with_days, create_choose_time_student, give_date_format_fsm, \
     give_time_format_fsm, create_delete_time_student, show_all_lessons_for_day, \
     give_text_information_lesson, course_class_choose, COUNT_BAN, give_result_status_timeinterval, NUMERIC_DATE
@@ -592,13 +590,13 @@ async def process_show_full_information_lesson(callback: CallbackQuery, session:
                                                                                             counter_lessons)
                                      )
 
-#Отправляем сообщение преподавателю с ожиданием подтверждения оплаты
+##################### Отправляем сообщение преподавателю с ожиданием подтверждения оплаты ############################
 @router.callback_query(InformationLessonCallbackFactory.filter(), IsNotAlreadyConfirmed())
 async def process_sent_student_payment_confirmation(callback: CallbackQuery, teacher_id: int, bot: Bot,
                                                     callback_data: InformationLessonCallbackFactory):
     week_date = give_date_format_fsm(callback_data.week_date)
     await bot.send_message(chat_id=teacher_id,
-                           text=LEXICON_TASKIQ['sent_student_payment_confirmation']
+                           text=LEXICON_STUDENT['sent_student_payment_confirmation']
                            .format(callback_data.name, callback_data.surname,
                                    callback_data.subject, week_date.strftime("%d.%m"),
                                    NUMERIC_DATE[date(year=week_date.year,
@@ -615,6 +613,11 @@ async def process_sent_student_payment_confirmation(callback: CallbackQuery, tea
 @router.callback_query(InformationLessonCallbackFactory.filter(), ~IsNotAlreadyConfirmed())
 async def process_not_sent_student_payment_confirmation(callback: CallbackQuery):
     await callback.answer(text=LEXICON_STUDENT['already_confirm_lesson'])
+
+#Получаем обратное сообщение с подтверждением (Нажали на кнопку __Ок__)
+@router.callback_query(F.data == 'notification_confirmation_student')
+async def process_give_repeat_message_confirmation(callback: CallbackQuery, bot: Bot):
+    await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
 
 ###################################### Кнопка НАСТРОЙКИ #############################################
 

@@ -15,9 +15,11 @@ from database import AccessStudent
 
 from aiogram.fsm.storage.redis import RedisStorage
 
+from database.base import Base
 from handlers import teacher_handlers, everyone_handlers, student_handlers, other_handlers
 from keyboards.everyone_kb import set_new_menu
 from middlewares.outer import DbSessionMiddleware
+from tasks import scheduled_payment_verification
 
 config = load_config()
 
@@ -49,6 +51,12 @@ async def main():
     engine = create_async_engine(url=config.tgbot.postgresql,
                                  echo=False)
 
+    # async with engine.begin() as connection:
+    #      await connection.run_sync(Base.metadata.drop_all)
+    #      print("Удалил")
+    #      await connection.run_sync(Base.metadata.create_all)
+    #      print("Создал")
+
     # Создаем хранилище redis для FSM
     storage = RedisStorage.from_url(config.tgbot.redis)
     # Устанавливаем вываливающуюся клавиатуру
@@ -69,7 +77,7 @@ async def main():
     await worker.startup()
 
     await scheduler_storage.startup()
-
+    await scheduled_payment_verification.kiq()
     # Логика настройки проверки оплаты в 23:50 по мск
     # await scheduler_storage.add_schedule(
     #     ScheduledTask(

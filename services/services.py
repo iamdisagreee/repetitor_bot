@@ -164,7 +164,8 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
     last_one = {'lesson_on': -1,
                 'lesson_off': -1,
                 'student_id': -1,
-                'list_status': []}
+                'list_status': [],
+                }
 
     for interval in list_lessons_not_formatted:
         # print(interval.work_start, interval.work_end)
@@ -173,7 +174,8 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
             cur_empty = {'lesson_on': interval.work_start,
                          'lesson_off': interval.work_end,
                          'student_id': None,
-                         'list_status': [-1]}
+                         'list_status': [-1]
+                         }
             empty_lessons.append(cur_empty)
         if interval.lessons:
             lessons_sort = sorted(interval.lessons, key=lambda gap: gap.lesson_start)

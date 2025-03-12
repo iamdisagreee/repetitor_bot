@@ -1,3 +1,4 @@
+from .models.debtor import Debtor
 from .models.teacher import Teacher
 from .models.student import Student
 from .models.lesson_week import LessonWeek
@@ -14,4 +15,5 @@ __all__ = [
     "Penalty",
     "AccessStudent",
     "AccessTeacher",
+    "Debtor"
 ]

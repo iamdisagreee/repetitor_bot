@@ -1,5 +1,5 @@
 import asyncio
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 from aiogram import Bot
 from aiogram.exceptions import TelegramForbiddenError, TelegramRetryAfter
@@ -12,10 +12,11 @@ from taskiq import Context, TaskiqDepends
 from sqlalchemy import select
 
 from database.taskiq_requests import give_scheduled_payment_verification_students, \
-    give_scheduled_payment_verification_teachers
-from keyboards.taskiq_kb import create_confirm_payment_teacher_kb
+    give_scheduled_payment_verification_teachers, give_information_for_day
+from database.teacher_requests import give_all_lessons_day_by_week_day
 from lexicon.lexicon_taskiq import LEXICON_TASKIQ
-from services.services import NUMERIC_DATE, give_date_format_fsm
+from services.services import NUMERIC_DATE, give_date_format_fsm, show_intermediate_information_lesson_day_status
+from services.services_taskiq import give_data_config_teacher
 
 
 #Таска, которая отправляет всем неоплаченным студентам уведомление о неоплате!
@@ -29,7 +30,6 @@ async def scheduled_payment_verification(context: Context = TaskiqDepends(),
             list_not_paid_student = iter(await give_scheduled_payment_verification_students(session))
             # list_not_paid_teachers = iter()
     # Работа с сообщениями для учеников
-    #list_not_paid_students = [lesson.student_id for student in list_not_paid_info]
     while True:
         try:
             for student_id in list_not_paid_student:
@@ -51,25 +51,29 @@ async def scheduled_payment_verification(context: Context = TaskiqDepends(),
     #Работа с сообщениями для преподавателей
     async with context.state.session_pool() as session:
         list_not_paid_teachers = iter(await give_scheduled_payment_verification_teachers(session))
-
+        information_day = await give_information_for_day(session)
+    data_config_res = give_data_config_teacher(information_day)
     while True:
         try:
             for teacher in list_not_paid_teachers:
-                #При условии, что есть должникиs
-                if teacher.students:
-                    create_list_students = '/n'.join(f'{student.name} {student.surname}'
-                                                     for student in teacher.students)
-                    await bot.send_message(teacher.teacher_id, LEXICON_TASKIQ['info_non_payment_teacher']
-                                           .format(datetime.now().strftime("%d.%m"), create_list_students))
-                else:
-                    await bot.send_message(teacher.teacher_id, LEXICON_TASKIQ['info_good_day']
-                                           .format(datetime.now().strftime("%d.%m")))
+                #При условии, что есть должники
+                data_config_cur = data_config_res.get(teacher.teacher_id)
+                create_list_students = '/n'.join(f'  - {student.name} {student.surname}'
+                                                         for student in teacher.students)
+                time_cur = data_config_cur['amount_time']
+                await bot.send_message(teacher.teacher_id, LEXICON_TASKIQ['info_non_payment_teacher']
+                                            .format(datetime.now().strftime("%d.%m"),
+                                                    f'{time_cur // 3600} ч.'
+                                                    f' {time_cur // 60 % 60} мин.',
+                                                    data_config_cur['amount_money_yes'],
+                                                    data_config_cur['amount_money_no'],
+                                                    create_list_students))
+
             break
         except TelegramRetryAfter as e:
-            await asyncio.sleep(float(e.retry_after))
-            continue
+                await asyncio.sleep(float(e.retry_after))
+                continue
     print('Рассылка для преподавателей окончена!!')
-
 
 # @worker.task
 # async def sent_student_payment_confirmation(teacher_id: int,

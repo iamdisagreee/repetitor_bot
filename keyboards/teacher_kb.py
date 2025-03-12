@@ -407,3 +407,15 @@ def show_list_of_debtors_kb(students):
                                 callback_data='management_students')]
                         ]
     )
+
+
+def create_notification_confirmation_student_kb():
+    notification_confirmation_student_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text=LEXICON_TEACHER['ok'],
+                callback_data='notification_confirmation_student'
+            )]
+        ]
+    )
+    return notification_confirmation_student_kb

@@ -57,3 +57,30 @@ async def give_scheduled_payment_verification_teachers(session: AsyncSession):
     #         print(student.name)
     # return result.scalars()
 
+#Получаем всю статистику за день
+async def give_information_for_day(session: AsyncSession):
+    # result = await session.execute(
+    #     select(Teacher)
+    # )
+    # return result.scalars()
+    result = await session.execute(
+        select(Teacher)
+        .options(
+            selectinload(Teacher.students)
+            .selectinload(
+                Student.lessons.and_(LessonDay.week_date == datetime.now().date()))
+        )
+    )
+
+    teachers = result.scalars()
+    return teachers
+    #
+    # for teacher in teachers:
+    #     print('Учитель:', teacher.name, teacher.surname)
+    #     print('Ученики:')
+    #     for student in teacher.students:
+    #         print(student.name, student.surname)
+    #         print('Занятия:')
+    #         for lesson in student.lessons:
+    #             print(f'{lesson.lesson_start}-{lesson.lesson_finished}')
+
