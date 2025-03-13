@@ -9,6 +9,7 @@ from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
 from taskiq_nats import NATSKeyValueScheduleSource
+from sqlalchemy import select
 
 from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
@@ -593,12 +594,14 @@ async def process_show_full_information_lesson(callback: CallbackQuery, session:
 ##################### Отправляем сообщение преподавателю с ожиданием подтверждения оплаты ############################
 @router.callback_query(InformationLessonCallbackFactory.filter(), IsNotAlreadyConfirmed())
 async def process_sent_student_payment_confirmation(callback: CallbackQuery, teacher_id: int, bot: Bot,
+                                                    session: AsyncSession,
                                                     callback_data: InformationLessonCallbackFactory):
     week_date = give_date_format_fsm(callback_data.week_date)
+    student = (await session.execute(select(Student).where(Student.student_id == callback.from_user.id))).scalar()
     await bot.send_message(chat_id=teacher_id,
                            text=LEXICON_STUDENT['sent_student_payment_confirmation']
-                           .format(callback_data.name, callback_data.surname,
-                                   callback_data.subject, week_date.strftime("%d.%m"),
+                           .format(student.name, student.surname,
+                                   student.subject, week_date.strftime("%d.%m"),
                                    NUMERIC_DATE[date(year=week_date.year,
                                                      month=week_date.month,
                                                      day=week_date.day).isoweekday()],

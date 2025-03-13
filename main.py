@@ -77,7 +77,7 @@ async def main():
     await worker.startup()
 
     await scheduler_storage.startup()
-    await scheduled_payment_verification.kiq()
+    # await scheduled_payment_verification.kiq()
     # Логика настройки проверки оплаты в 23:50 по мск
     # await scheduler_storage.add_schedule(
     #     ScheduledTask(

@@ -49,10 +49,7 @@ class DeleteStudentToStudyCallbackFactory(CallbackData, prefix='delete_student')
 class PlugPenaltyStudentCallbackFactory(CallbackData, prefix='plug'):
     plug: str
 
-class InformationLessonCallbackFactory(CallbackData, prefix='lesson', sep=';'):
-    name: str
-    surname: str
-    subject: str
+class InformationLessonCallbackFactory(CallbackData, prefix='a', sep=';'):
     week_date: str
     lesson_on: str
     lesson_off: str

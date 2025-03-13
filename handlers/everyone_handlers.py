@@ -18,7 +18,7 @@ async def process_start_using_bot(message: Message, state: FSMContext,
                                   ):
     await message.answer(text=LEXICON_ALL['start'],
                          reply_markup=create_start_kb())
-    await give_information_for_day(session)
+    # await give_information_for_day(session)
     await state.clear()
 
 

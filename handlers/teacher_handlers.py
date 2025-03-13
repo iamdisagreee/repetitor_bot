@@ -18,7 +18,7 @@ from callback_factory.teacher_factories import ShowDaysOfPayCallbackFactory, Edi
     SentMessagePaymentStudentCallbackFactory
 from database import Student, LessonDay, LessonWeek, AccessStudent
 from database.models import Penalty
-from database.taskiq_requests import give_scheduled_payment_verification_teachers
+# from database.taskiq_requests import give_scheduled_payment_verification_teachers
 from database.teacher_requests import command_add_teacher, command_add_lesson_week, give_installed_lessons_week, \
     delete_week_day, give_all_lessons_day_by_week_day, change_status_pay_student, \
     give_information_of_one_lesson, delete_lesson, delete_teacher_profile, \
@@ -50,6 +50,7 @@ from services.services import give_list_with_days, give_time_format_fsm, give_da
     give_list_registrations_str, show_intermediate_information_lesson_day_status, give_result_info, COUNT_BAN, \
     course_class_choose, NUMERIC_DATE
 from services.services_taskiq import give_available_ids
+from tasks import daily_newsletter_teacher
 
 # Ученик - ничего не происходит
 # Преподаватель - открываем
@@ -62,6 +63,7 @@ router.callback_query.filter(TeacherStartFilter())
 ############################### Логика входа в меню идентификации #######################################
 @router.callback_query(F.data == 'teacher_entrance')
 async def process_entrance(callback: CallbackQuery):
+    await daily_newsletter_teacher.kiq(7880267101)
     teacher_entrance_kb = create_entrance_kb()
     await callback.message.edit_text(text=LEXICON_TEACHER['menu_identification'],
                                      reply_markup=teacher_entrance_kb)
@@ -175,7 +177,7 @@ async def process_not_start_authorization(callback: CallbackQuery):
 @router.callback_query(F.data == 'auth_teacher', IsTeacherInDatabase())
 async def process_start_authorization(callback: CallbackQuery, session: AsyncSession,
                                       scheduler_storage: NATSKeyValueScheduleSource):
-    await give_scheduled_payment_verification_teachers(session)
+    # await give_scheduled_payment_verification_teachers(session)
     # Логика настройки проверки оплаты в 23:50 по мск
     # available_ids = await give_available_ids(
     #     scheduler_storage)  # set(map(lambda x: x.schedule_id, await scheduler_storage.get_schedules()))
@@ -754,3 +756,10 @@ async def process_show_list_debtors(callback: CallbackQuery):
 @router.callback_query(PlugPenaltyTeacherCallbackFactory.filter())
 async def process_show_list_debtors_plug(callback):
     await callback.answer()
+
+
+############################## НАЖИМАЕМ __ОК__ В ЕЖЕДНЕВНОЙ РАССЫЛКЕ ###################################
+@router.callback_query(F.data == 'confirmation_day_teacher')
+async def process_confirmation_day_teacher(callback: CallbackQuery, bot: Bot):
+    await bot.delete_message(chat_id=callback.message.chat.id,
+                             message_id=callback.message.message_id)

@@ -241,9 +241,6 @@ def create_button_for_back_to_all_lessons_day(week_date_str,
         inline_keyboard=[
             [InlineKeyboardButton(text=LEXICON_STUDENT['confirm_lesson'],
                                   callback_data=InformationLessonCallbackFactory(
-                                      name=student.name,
-                                      surname=student.surname,
-                                      subject=student.subject,
                                       week_date=week_date_str,
                                       lesson_on=lesson_on,
                                       lesson_off=lesson_off,
