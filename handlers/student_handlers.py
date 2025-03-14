@@ -14,6 +14,7 @@ from sqlalchemy import select
 from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
     StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory, InformationLessonCallbackFactory
+from callback_factory.taskiq_factories import InformationLessonWithDeleteCallbackFactory
 from database import Student, LessonDay
 from database.student_requests import command_get_all_teachers, command_add_students, give_lessons_week_for_day, \
     add_lesson_day, give_teacher_by_student_id, give_all_busy_time_intervals, \
@@ -592,6 +593,8 @@ async def process_show_full_information_lesson(callback: CallbackQuery, session:
                                      )
 
 ##################### Отправляем сообщение преподавателю с ожиданием подтверждения оплаты ############################
+
+#Нажали __отправить__ из меню ученика
 @router.callback_query(InformationLessonCallbackFactory.filter(), IsNotAlreadyConfirmed())
 async def process_sent_student_payment_confirmation(callback: CallbackQuery, teacher_id: int, bot: Bot,
                                                     session: AsyncSession,
@@ -621,6 +624,29 @@ async def process_not_sent_student_payment_confirmation(callback: CallbackQuery)
 @router.callback_query(F.data == 'notification_confirmation_student')
 async def process_give_repeat_message_confirmation(callback: CallbackQuery, bot: Bot):
     await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
+
+#Нажали __отправить__, так как пришло сообщение о том, что в должниках
+@router.callback_query(InformationLessonWithDeleteCallbackFactory.filter(), IsNotAlreadyConfirmed())
+async def process_sent_student_payment_confirmation(callback: CallbackQuery, teacher_id: int, bot: Bot,
+                                                    session: AsyncSession,
+                                                    callback_data: InformationLessonCallbackFactory):
+    week_date = give_date_format_fsm(callback_data.week_date)
+    student = (await session.execute(select(Student).where(Student.student_id == callback.from_user.id))).scalar()
+    await bot.send_message(chat_id=teacher_id,
+                           text=LEXICON_STUDENT['sent_student_payment_confirmation']
+                           .format(student.name, student.surname,
+                                   student.subject, week_date.strftime("%d.%m"),
+                                   NUMERIC_DATE[date(year=week_date.year,
+                                                     month=week_date.month,
+                                                     day=week_date.day).isoweekday()],
+                                   callback_data.lesson_on, callback_data.lesson_off,
+                                   callback_data.full_price),
+                           reply_markup=create_confirm_payment_teacher_kb(callback.from_user.id,
+                                                                          callback_data)
+                           )
+    await callback.answer(text=LEXICON_STUDENT['student_payment_confirmation_good'])
+    await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
+
 
 ###################################### Кнопка НАСТРОЙКИ #############################################
 

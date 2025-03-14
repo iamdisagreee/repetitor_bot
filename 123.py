@@ -23,3 +23,5 @@ for el in b:
     break
 for el in b:
     print(el)
+
+print(type(date.today()))
