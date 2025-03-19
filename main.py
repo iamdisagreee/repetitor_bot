@@ -19,7 +19,7 @@ from database.base import Base
 from handlers import teacher_handlers, everyone_handlers, student_handlers, other_handlers
 from keyboards.everyone_kb import set_new_menu
 from middlewares.outer import DbSessionMiddleware
-from tasks import scheduled_payment_verification
+# from tasks import scheduled_payment_verification
 
 config = load_config()
 

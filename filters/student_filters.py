@@ -72,7 +72,8 @@ class IsMoveRightAddMenu(BaseFilter):
 
         student = await give_teacher_by_student_id(session,
                                                    callback.from_user.id)
-        lessons_week = await give_lessons_week_for_day(session, week_date,
+        lessons_week = await give_lessons_week_for_day(session,
+                                                       week_date,
                                                        student.teacher_id)
 
         lessons_busy = await give_all_busy_time_intervals(session,

@@ -17,5 +17,9 @@ LEXICON_TASKIQ = {
                      'День подошел к концу!\n'
                      'У ваших учеников нет долгов!',
     'ok': 'Ок',
-    'confirm_payment_student': 'Подтвердить'
+    'confirm_payment_student': 'Подтвердить',
+    'notice_lesson_certain_time_student': 'Уважаемый <b>{}</b>!\n'
+                                          'Ваше занятие начнется через <u>{}</u> минут!',
+    'give_everyday_schedule': 'Ваше расписание на день!\n'
+                              '{}'
 }

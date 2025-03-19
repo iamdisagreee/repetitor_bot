@@ -50,7 +50,7 @@ from services.services import give_list_with_days, give_time_format_fsm, give_da
     give_list_registrations_str, show_intermediate_information_lesson_day_status, give_result_info, COUNT_BAN, \
     course_class_choose, NUMERIC_DATE
 from services.services_taskiq import give_available_ids
-from tasks import daily_newsletter_teacher
+from tasks import daily_newsletter_teacher, activities_day_teacher
 
 # Ученик - ничего не происходит
 # Преподаватель - открываем
@@ -63,7 +63,8 @@ router.callback_query.filter(TeacherStartFilter())
 ############################### Логика входа в меню идентификации #######################################
 @router.callback_query(F.data == 'teacher_entrance')
 async def process_entrance(callback: CallbackQuery):
-    await daily_newsletter_teacher.kiq(7880267101)
+    # await daily_newsletter_teacher.kiq(7880267101)
+    # await activities_day_teacher.kiq(callback.from_user.id)
     teacher_entrance_kb = create_entrance_kb()
     await callback.message.edit_text(text=LEXICON_TEACHER['menu_identification'],
                                      reply_markup=teacher_entrance_kb)

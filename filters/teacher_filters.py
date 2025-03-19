@@ -51,7 +51,8 @@ class IsBankCorrectInput(BaseFilter):
 # Правильно ли введено пенальти
 class IsPenaltyCorrectInput(BaseFilter):
     async def __call__(self, message: Message):
-        return message.text.isdigit() and int(message.text) >= 0
+        return message.text.isdigit() and int(message.text) >= 0 \
+    and int(message.txt) == 0 #Отключаем систему пенальти
 
 
 # Фильтр, который отлавливает апдейты, когда мы нажимаем на один из дней расписания

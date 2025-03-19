@@ -37,6 +37,7 @@ from lexicon.lexicon_student import LEXICON_STUDENT
 from services.services import give_list_with_days, create_choose_time_student, give_date_format_fsm, \
     give_time_format_fsm, create_delete_time_student, show_all_lessons_for_day, \
     give_text_information_lesson, course_class_choose, COUNT_BAN, give_result_status_timeinterval, NUMERIC_DATE
+from tasks import notice_lesson_certain_time_student
 
 # Преподаватель - нет доступа
 # Ученик - открываем
@@ -48,6 +49,7 @@ router.callback_query.filter(StudentStartFilter())
 
 @router.callback_query(F.data == 'student_entrance')
 async def process_entrance(callback: CallbackQuery):
+    # await notice_lesson_certain_time_student.kiq(callback.from_user.id)
     await callback.message.edit_text(text=LEXICON_STUDENT['menu_identification'],
                                      reply_markup=create_entrance_kb())
 

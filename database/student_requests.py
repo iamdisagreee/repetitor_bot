@@ -67,7 +67,8 @@ async def give_lessons_week_for_day(session: AsyncSession,
         .where(
             and_(LessonWeek.week_date == week_date,
                  LessonWeek.teacher_id == teacher_id)
-        ).order_by(LessonWeek.work_start)
+        )
+        .order_by(LessonWeek.work_start)
     )
 
     lessons_week_for_day = await session.execute(stmt)
@@ -85,7 +86,6 @@ async def give_all_busy_time_intervals(session: AsyncSession,
             and_(
                 LessonDay.week_date == week_date,
                 LessonDay.teacher_id == teacher_id
-
             )
         )
     )
