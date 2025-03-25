@@ -1,0 +1,94 @@
+def setting_up_notifications_for_students(context: Context = TaskiqDepends(),
+					  bot: Bot = TaskiqDepends()):
+					  
+	async with context.state.session_pool() as session:
+	
+		subq = await session.execute(
+		    select(
+			LessonDay
+		    )
+		    .where(LessonDay.week_date == date.today())
+		    .order_by(StudentLesson.lesson_on)
+		    .subquery()
+		)
+
+        lesson_day_alias = aliased(LessonDay, subq)
+
+		# Затем группируем с сохранением порядка
+		list_students_id = (
+		    await session.execute(
+		        select(
+			    lesson_day_alias.student_id,
+			    func.array_agg(lesson_day_alias)
+		        )
+		        .group_by(lesson_day_alias.student_id)
+		    )
+		).all()
+		 # student_id = [lesson_on1, lesson_on2, ...]
+
+        #Смотрим расписание каждого студента по student_id
+		for student_id, lessons_day in list_students_id:
+
+            if len(lessons_days) == 1:
+                if lessons_day[0].student_mailing_status == 0:
+                    # меняем статус и устанавливаем уведомление
+                    continue
+
+            index = -1
+            need_change = 0
+            for lesson_day in lessons_day:
+                index += 1
+                count_lessons = 0
+                if lesson_day.student_mailing_status == 0:
+                    for lesson_day_next in lessons_day[index+1:]:
+                        if (
+                        timedelta(hours=lessons_day_next.lesson_start.hour,
+                                    minutes=lessons_day_next.lesson_finished.minute) - \
+                        timedelta(hours=lessons_day.lesson_start.hour,
+                                    minutes=lessons_day.lesson_finished.minute)
+                        ).total_seconds() == 1800:
+
+                            if lesson_day_next.student_mailing_status == 1:
+                                need_change = 1
+                                # удаляем текущее уведомление (lesson_day_next.student_mailing_status)
+                                break
+                            else:
+                                count_lessons += 1
+                        else:
+                            break
+
+                only_change = False
+                if count_lessons != 0:
+                    #Условие когда добавили в конец
+                    if lessons_day[index-1].student_mailing_status == 1 and \
+                        check_is_30_minutes_between(lessons_day[index-1], lessons_day[index]):
+                            only_change = True
+                            #Меняем все значение в диапазоне [index-count_lessons:index++1]
+                    else:
+                        #Случай, когда добавили в середине, но уведомления уже проставлены раньше
+                        decreasing_index = index
+                        while decreasing_index > 0:
+                            if check_is_30_minutes_between(lessons_day[decreasing_index],
+                                                            lessons_day[decreasing_index-1]) \
+                                        and lessons_days[decreasing_index-1].student_mailing_status == 1:
+                                only_change = True
+                                break
+
+                            decreasing_index -= 1
+
+                    #Меняем все в диапазоне [index-count_lessons:index+1]
+                    if not only_changing:
+                        #И ставим уведомление на index - count_lessons
+
+                if need_change and cont_lessons == 0:
+                    #Меняем все в диапазоне [index-count_lessons:index+1]
+                    #И ставим уведомление на index - count_lessons
+
+
+
+def check_is_30_minutes_between(time_one, time_two):
+    #time_one < time_two
+    return (
+            timedelta(hours=time_two.lesson_start.hour, minutes=time_two.lesson_finished.minute) - \
+            timedelta(hours=time_one.lesson_start.hour, minutes=time_one.lesson_finished.minute)
+           ).total_seconds() ==  1800 #30 минутв

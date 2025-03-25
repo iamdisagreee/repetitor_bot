@@ -46,6 +46,12 @@ class LessonDay(Base):
                                          server_default=expression.false(),
                                          )
 
+    student_mailing_status: Mapped[bool] = mapped_column(Boolean,
+                                                         server_default=expression.false())
+
+    teacher_mailing_status: Mapped[bool] = mapped_column(Boolean,
+                                                         server_default=expression.false())
+
     __table_args__ = (ForeignKeyConstraint(['week_id', 'week_date', 'teacher_id'],
                                            [lesson_week.LessonWeek.week_id,
                                             lesson_week.LessonWeek.week_date,

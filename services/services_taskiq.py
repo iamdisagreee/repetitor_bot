@@ -1,5 +1,11 @@
+import uuid
+from datetime import timedelta, datetime
+from typing import Dict, Any, List, Optional, Union
+
 from numpy.version import full_version
+from pydantic import Field
 from sqlalchemy.ext.asyncio import AsyncSession
+from taskiq import ScheduledTask
 
 from database import Teacher
 
@@ -96,3 +102,40 @@ def create_schedule_like_text(result_schedule):
                  f"\n"
 
     return text
+
+
+def check_is_30_minutes_between(time_one, time_two):
+    #time_one < time_two
+    print((
+            timedelta(hours=time_two.hour, minutes=time_two.minute) -
+            timedelta(hours=time_one.hour, minutes=time_one.minute)
+           ).total_seconds() )
+    return (
+            timedelta(hours=time_two.hour, minutes=time_two.minute) -
+            timedelta(hours=time_one.hour, minutes=time_one.minute)
+           ).total_seconds() ==  1800 #30 минут
+
+def create_scheduled_task(task_name: str,
+                        labels: Dict[str, Any] = None,
+                        args: List[Any] = None,
+                        kwargs: Dict[str, Any] = None,
+                        schedule_id: str = Field(default_factory=lambda: uuid.uuid4().hex),
+                        cron: Optional[str] = None,
+                        cron_offset: Optional[Union[str, timedelta]] = None,
+                        time: Optional[datetime] = None
+                        ):
+    if labels is None:
+        labels = dict()
+    if args is None:
+        args = []
+    if kwargs is None:
+        kwargs = dict()
+    return ScheduledTask(task_name = task_name,
+                        labels = labels,
+                        args = args,
+                        kwargs = kwargs,
+                        schedule_id = schedule_id,
+                        cron = cron,
+                        cron_offset = cron_offset,
+                        time = time,
+    )

@@ -3,7 +3,8 @@ from taskiq import TaskiqScheduler
 from taskiq_nats import PullBasedJetStreamBroker, NATSObjectStoreResultBackend, NATSKeyValueScheduleSource
 
 worker = PullBasedJetStreamBroker(
-    servers='localhost').with_result_backend(
+    servers='localhost',
+    queue='taskiq_queue').with_result_backend(
     result_backend=NATSObjectStoreResultBackend(servers='localhost')
 )
 
