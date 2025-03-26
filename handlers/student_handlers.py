@@ -719,3 +719,9 @@ async def process_not_work_penalties(callback: CallbackQuery):
 @router.callback_query(F.data == 'penalties', ~IsStudentHasPenalties())
 async def process_not_penalties(callback: CallbackQuery):
     await callback.answer(LEXICON_STUDENT['has_not_penalty'])
+
+
+# Нажимаем __ОК__, когда пришло уведомление за какое-то время до занятия
+@router.callback_query(F.data == 'notice_lesson_certain_time_student')
+async def create_notice_lesson_certain_time_student(callback: CallbackQuery, bot: Bot):
+    await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)

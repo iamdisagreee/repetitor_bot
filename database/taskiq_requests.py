@@ -53,30 +53,11 @@ async def give_student_by_student_id(session: AsyncSession,
 #Информация для каждого student_id: [student_id = [lesson_on1, lesson_on2, ...], ...]
 async def give_lessons_for_day_students(session: AsyncSession):
 
-    # sub = (
-    #     select(LessonDay)
-    #     .where(LessonDay.week_date == date.today())
-    #     .order_by(LessonDay.lesson_start)
-    #     .subquery()
-    # )
-    #
-    # lesson_day_alias = aliased(LessonDay, sub)
-    #
-    # # Затем группируем с сохранением порядка
-    # list_students_id = (
-    #     await session.execute(
-    #         select(
-    #             Les
-    #             func.array_agg(lesson_day_alias)
-    #         )
-    #         .group_by(lesson_day_alias.student_id)
-    #     )
-    # ).all()
-
     lessons = (await session.execute(
         select(LessonDay)
         .where(LessonDay.week_date == date.today())
         .order_by(LessonDay.lesson_start)
+        .options(selectinload(LessonDay.student))
     )).scalars().all()
 
     group_dict = defaultdict(list)
@@ -85,3 +66,17 @@ async def give_lessons_for_day_students(session: AsyncSession):
         group_dict[lesson.student_id].append(lesson)
     return group_dict
 
+#Информация для каждого teacher_id: [teacher_id = [lesson_on1, lesson_on2, ...], ...]
+async def give_lessons_for_day_teacher(session: AsyncSession):
+    lessons = (await session.execute(
+        select(LessonDay)
+        .where(LessonDay.week_date == date.today())
+        .order_by(LessonDay.lesson_start)
+        .options(selectinload(LessonDay.student).selectinload(Student.teacher))
+    )).scalars().all()
+
+    group_dict = defaultdict(list)
+
+    for lesson in lessons:
+        group_dict[lesson.student.teacher.teacher_id].append(lesson)
+    return group_dict

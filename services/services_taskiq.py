@@ -1,9 +1,10 @@
 import uuid
-from datetime import timedelta, datetime
+from datetime import timedelta, datetime, date, time
 from typing import Dict, Any, List, Optional, Union
 
 from numpy.version import full_version
 from pydantic import Field
+from sqlalchemy import result_tuple
 from sqlalchemy.ext.asyncio import AsyncSession
 from taskiq import ScheduledTask
 
@@ -110,6 +111,30 @@ def check_is_30_minutes_between(time_one, time_two):
             timedelta(hours=time_two.hour, minutes=time_two.minute) -
             timedelta(hours=time_one.hour, minutes=time_one.minute)
            ).total_seconds() ==  1800 #30 минут
+
+def change_to_specified_time(cur_time: time, change_td: timedelta):
+    now = date.today()
+    dt_result = datetime(now.year, now.month, now.day, cur_time.hour, cur_time.minute) + change_td
+    return dt_result.hour, dt_result.minute#time(hour=dt_result.hour, minute=dt_result.minute)
+
+def give_correct_time_schedule_before_lesson(lesson_start: time, until_hour: int, until_minute: int):
+    now = datetime.now()
+    until_time = timedelta(hours=until_hour, minutes=until_minute)
+    sum_now_until = now + until_time
+
+    #Случай, когда время уведомления уже наступило. Тогда отправляем текущее кол-во минут до занятия
+    if time(hour=sum_now_until.hour, minute=sum_now_until.minute) >= lesson_start:
+
+        result_sent_time = datetime(year=now.year, month=now.month, day=now.day,
+                                    hour=lesson_start.hour, minute=lesson_start.minute) - \
+                            timedelta(hours=now.hour, minutes=now.minute)
+        until_hour, until_minute = result_sent_time.hour, result_sent_time.minute
+    #Если все же заданное ограничение по времени сохраняется
+    else:
+        result_sent_time = datetime(year=now.year, month=now.month, day=now.day,
+                                    hour=lesson_start.hour, minute=lesson_start.minute) - until_time
+
+    return result_sent_time, until_hour, until_minute
 
 def create_scheduled_task(task_name: str,
                         labels: Dict[str, Any] = None,

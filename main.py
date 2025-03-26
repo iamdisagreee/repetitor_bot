@@ -19,7 +19,7 @@ from database.base import Base
 from handlers import teacher_handlers, everyone_handlers, student_handlers, other_handlers
 from keyboards.everyone_kb import set_new_menu
 from middlewares.outer import DbSessionMiddleware
-from tasks import student_mailing_lessons_student
+from tasks import student_mailing_lessons, teacher_mailing_lessons
 
 # from tasks import scheduled_payment_verification
 
@@ -79,7 +79,7 @@ async def main():
     await worker.startup()
 
     await scheduler_storage.startup()
-    await student_mailing_lessons_student.kiq()
+    await student_mailing_lessons.kiq()
     # await scheduled_payment_verification.kiq()
     # Логика настройки проверки оплаты в 23:50 по мск
     # await scheduler_storage.add_schedule(
