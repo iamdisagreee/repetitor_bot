@@ -101,7 +101,7 @@ async def activities_day_teacher(teacher_id: int,
                                  bot: Bot = TaskiqDepends()):
     async with context.state.session_pool() as session:
         teacher = await give_information_for_day(session,
-                                           teacher_id)
+                                                 teacher_id)
 
     result_schedule = give_everyday_schedule(teacher)
     text_schedule = create_schedule_like_text(result_schedule)
@@ -109,127 +109,138 @@ async def activities_day_teacher(teacher_id: int,
     await bot.send_message(chat_id=teacher_id, text=LEXICON_TASKIQ['give_everyday_schedule']
                            .format(text_schedule))
 
+
 @worker.task(task_name='student_mailing_lessons_student')
 async def student_mailing_lessons_student(context: Context = TaskiqDepends(),
-                                  bot: Bot = TaskiqDepends()):
-
+                                          bot: Bot = TaskiqDepends()):
     await scheduler_storage.startup()
 
     scheduled_tasks = defaultdict(list)
     for task in await scheduler_storage.get_schedules():
-        (scheduled_tasks[int(list(task.labels.keys())[0])]
-         .append(give_time_format_fsm(list(task.labels.values())[0][:-3])))
+        scheduled_tasks[int(list(task.labels.keys())[0])] \
+         .append(give_time_format_fsm(list(task.labels.values())[0][:-3]))
 
-    print(scheduled_tasks)
+    # print(scheduled_tasks)
     print(await scheduler_storage.get_schedules())
 
     async with context.state.session_pool() as session:
         list_students_id = await give_lessons_for_day_students(session)
 
-        #Смотрим расписание каждого студента по student_id
+        # Смотрим расписание каждого студента по student_id
         for student_id, lessons_day in list_students_id.items():
 
+            # # Проверяем, что таска не удалена. Если удалена,
+            # # то меняем статус в обе стороны для всех занятий
+            # set_lessons_day = set(lesson_day.lesson_start for lesson_day in lessons_day)
+            # for task_lesson_start in scheduled_tasks[student_id]:
+            #     # Если такого времени нет, то удаляем задачу и меняем статуса в левую и правую сторону
+            #     if task_lesson_start not in set_lessons_day:
+            #         await scheduler_storage.delete_schedule(f'b_l_{student_id}_{task_lesson_start}')
+
+
+            print([x.lesson_start for x in lessons_day])
             if len(lessons_day) == 1:
                 if lessons_day[0].student_mailing_status == 0:
                     # меняем статус и устанавливаем уведомление + добавляем в текущее хранилище
                     lessons_day[0].student_mailing_status = 1
                     await scheduler_storage.add_schedule(
                         create_scheduled_task(task_name='notice_lesson_certain_time_student',
-                                              labels={str(student_id): lessons_day[0].lesson_start},
-                                              args=[student_id],
-                                              schedule_id=f'b_l_{student_id}_{str(lessons_day[0].lesson_start)}',
-                                              time=datetime.now() + timedelta(seconds=10))
+                                              labels={str(student_id): str(lessons_day[0].lesson_start)},
+                                              kwargs={'student_id': student_id, 'lesson_start': lesson_day.lesson_start},
+                                              schedule_id=f'b_l_{student_id}_{lessons_day[0].lesson_start}',
+                                              time=datetime.now(timezone.utc) + timedelta(seconds=10))
                     )
-                    scheduled_tasks[student_id].append(lessons_day[0].lesson_start)
+                    # scheduled_tasks[student_id].append(lessons_day[0].lesson_start)
                     continue
 
             need_change = 0
             for index, lesson_day in enumerate(lessons_day):
                 count_lessons = 0
                 # print("INFO", lesson_day.student_mailing_status, index, len(lessons_day))
-                if lesson_day.student_mailing_status == 0 and index+1 < len(lessons_day):
-                    for lesson_day_next in lessons_day[index+1:]:
+                if lesson_day.student_mailing_status == 0 and index + 1 < len(lessons_day):
+                    for lesson_day_next in lessons_day[index + 1:]:
                         # print("INDEX", index)
                         if check_is_30_minutes_between(lesson_day.lesson_start,
                                                        lesson_day_next.lesson_start):
                             if lesson_day_next.student_mailing_status == 1:
                                 need_change = 1
                                 # удаляем текущее уведомление (lesson_day_next.student_mailing_status)
-                                await scheduler_storage.delete_schedule(f'b_l_{student_id}_{lesson_day_next.lesson_start}')
+                                print('aue')
+                                await scheduler_storage.delete_schedule(
+                                    f'b_l_{student_id}_{lesson_day_next.lesson_start}')
                                 break
                             else:
                                 count_lessons += 1
                         else:
-                            # print('aaaaaaaaaaaaaaaaaa')
                             break
 
                         index += 1
 
+                if lesson_day.student_mailing_status == 1:
+                    continue
                 # #Случай, когда в конце один интервал со статусом 0
                 # if count_lessons == 0 and lessons_day[index].student_mailing_status == 0:
                 #     count_lessons += 1
 
                 only_change = False
-                if count_lessons == 0 or count_lessons != 0:
-                    #Условие когда добавили в конец
-                    if index != 0 and lessons_day[index-1].student_mailing_status == 1 and \
-                        check_is_30_minutes_between(lessons_day[index-1].lesson_start, lessons_day[index].lesson_start):
-                            only_change = True
-                            #Меняем все значение в диапазоне [index-count_lessons:index++1]
-                    else:
-                        #Случай, когда добавили в середине, но уведомления уже проставлены раньше
-                        decreasing_index = index
-                        while decreasing_index > 0:
-                            if check_is_30_minutes_between(lessons_day[decreasing_index-1].lesson_start,
-                                                            lessons_day[decreasing_index].lesson_start) \
-                                        and lessons_day[decreasing_index-1].student_mailing_status == 1:
-                                only_change = True
-                                break
+                # Условие когда добавили в конец
+                if index != 0 and lessons_day[index - 1].student_mailing_status == 1 and \
+                        check_is_30_minutes_between(lessons_day[index - 1].lesson_start,
+                                                    lessons_day[index].lesson_start):
+                    only_change = True
+                    print("ПОПАЛ")
 
-                            decreasing_index -= 1
 
-                        #Меняем все в диапазоне [index-count_lessons:index+1]
-                        for change_lesson_day in lessons_day[index-count_lessons: index+1]:
-                            # print(index, f'Поменял для {change_lesson_day.lesson_start}')
-                            change_lesson_day.student_mailing_status = 1
+                print('FULL INFO', index, count_lessons, only_change)
+                # Меня м все в диапазоне [index-count_lessons:index+1]
+                for change_lesson_day in lessons_day[index - count_lessons: index + 1]:
+                    print(index, f'Поменял для {change_lesson_day.lesson_start}')
+                    change_lesson_day.student_mailing_status = 1
 
-                        if not only_change:
-                            await scheduler_storage.add_schedule(
-                                create_scheduled_task(task_name='notice_lesson_certain_time_student',
-                                                      kwargs={'student_id': student_id},
-                                                      labels={str(student_id): str(lesson_day.lesson_start)},
-                                                      schedule_id=f'b_l_{student_id}_{lesson_day.lesson_start}',
-                                                      time=datetime.now(timezone.utc) + timedelta(seconds=10)
-                                                      )
-                            )
-                            scheduled_tasks[student_id].append(lesson_day.lesson_start)
-                            #И ставим уведомление на index - count_lessons
-                    # Меняем все в диапазоне [index-count_lessons:index+1]
+                if not only_change:
+                    await scheduler_storage.add_schedule(
+                        create_scheduled_task(task_name='notice_lesson_certain_time_student',
+                                              kwargs={'student_id': student_id, 'lesson_start': lesson_day.lesson_start},
+                                              labels={str(student_id): str(lesson_day.lesson_start)},
+                                              schedule_id=f'b_l_{student_id}_{lesson_day.lesson_start}',
+                                              cron='* * * * *',
+                                              cron_offset='Europe/Moscow',
+                                              # time=datetime.now(timezone.utc) + timedelta(seconds=10)
+                                              )
+                    )
+                    # scheduled_tasks[student_id].append(lesson_day.lesson_start)
                     # И ставим уведомление на index - count_lessons
-                    # if need_change and count_lessons == 0:
-                    #     for change_lesson_day in lessons_day[index - count_lessons: index + 1]:
-                    #         change_lesson_day.student_mailing_status = 1
-                    #     await scheduler_storage.add_schedule(
-                    #         create_scheduled_task(task_name='notice_lesson_certain_time_student',
-                    #                               kwargs={'student_id':student_id},
-                    #                               labels={str(student_id): lesson_day.lesson_start},
-                    #                               schedule_id=f'b_l_{student_id}_{lesson_day.lesson_start}',
-                    #                               time=datetime.now() + timedelta(seconds=5)
-                    #                               )
-                    #     )
-                    #     scheduled_tasks[student_id].append(lesson_day.lesson_start)
+                # Меняем все в диапазоне [index-count_lessons:index+1]
+                # И ставим уведомление на index - count_lessons
+                # if need_change and count_lessons == 0:
+                #     for change_lesson_day in lessons_day[index - count_lessons: index + 1]:
+                #         change_lesson_day.student_mailing_status = 1
+                #     await scheduler_storage.add_schedule(
+                #         create_scheduled_task(task_name='notice_lesson_certain_time_student',
+                #                               kwargs={'student_id':student_id},
+                #                               labels={str(student_id): lesson_day.lesson_start},
+                #                               schedule_id=f'b_l_{student_id}_{lesson_day.lesson_start}',
+                #                               time=datetime.now() + timedelta(seconds=5)
+                #                               )
+                #     )
+                #     scheduled_tasks[student_id].append(lesson_day.lesson_start)
 
         await session.commit()
-        print(scheduled_tasks)
-        print(await scheduler_storage.get_schedules())
+    print(scheduled_tasks)
+    for x in await scheduler_storage.get_schedules():
+        print(x.schedule_id)
+    await scheduler_storage.shutdown()
 
 
 # Уведомление о занятии за __переданное время__ до занятия для ученика
 @worker.task(task_name='notice_lesson_certain_time_student')
 async def notice_lesson_certain_time_student(student_id: int,
-                                           context: Context = TaskiqDepends(),
-                                           bot: Bot = TaskiqDepends()):
-    # async with context.state.session_pool() as session:
-    #     student = await give_student_by_student_id(session, student_id)
+                                             lesson_start: time,
+                                             context: Context = TaskiqDepends(),
+                                             bot: Bot = TaskiqDepends()):
 
-    await bot.send_message(chat_id=859717714, text='auf')
+    await bot.send_message(chat_id=student_id, text=str(lesson_start))
+
+    #После выполнения удаляем задачу
+    # await scheduler_storage.startup()
+    # await scheduler_storage.delete_schedule(f'b_l_{student_id}_{lesson_start.strftime("%H:%M")}')

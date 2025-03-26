@@ -106,10 +106,6 @@ def create_schedule_like_text(result_schedule):
 
 def check_is_30_minutes_between(time_one, time_two):
     #time_one < time_two
-    print((
-            timedelta(hours=time_two.hour, minutes=time_two.minute) -
-            timedelta(hours=time_one.hour, minutes=time_one.minute)
-           ).total_seconds() )
     return (
             timedelta(hours=time_two.hour, minutes=time_two.minute) -
             timedelta(hours=time_one.hour, minutes=time_one.minute)
