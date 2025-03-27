@@ -55,15 +55,17 @@ async def give_lessons_for_day_students(session: AsyncSession):
 
     lessons = (await session.execute(
         select(LessonDay)
-        .where(LessonDay.week_date == date.today())
+        .where(LessonDay.week_date >= date.today())
         .order_by(LessonDay.lesson_start)
         .options(selectinload(LessonDay.student))
     )).scalars().all()
 
-    group_dict = defaultdict(list)
+    group_dict = defaultdict(lambda: defaultdict(list))
 
     for lesson in lessons:
-        group_dict[lesson.student_id].append(lesson)
+        group_dict[lesson.student_id][lesson.week_date].append(lesson)
+
+    # print(group_dict)
     return group_dict
 
 #Информация для каждого teacher_id: [teacher_id = [lesson_on1, lesson_on2, ...], ...]
