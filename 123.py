@@ -40,16 +40,20 @@ from services.services_taskiq import check_is_30_minutes_between, give_correct_t
 #     z += 1
 #     print(x)
 
-lesson_start = time(22, 0)
-week_date = date(2025, 3, 28)
-until_hour = 30
-until_minute = 0
+# lesson_start = time(22, 0)
+# week_date = date(2025, 3, 28)
+# until_hour = 30
+# until_minute = 0
+#
+# result_sent_time, until_hour, until_minute = give_correct_time_schedule_before_lesson(
+#     lesson_start, week_date, until_hour, until_minute
+# )
+#
+# print(result_sent_time, until_hour, until_minute)
 
-result_sent_time, until_hour, until_minute = give_correct_time_schedule_before_lesson(
-    lesson_start, week_date, until_hour, until_minute
-)
 
-print(result_sent_time, until_hour, until_minute)
+a = {(1,2,3): 'a'}
+print(a)
 
 # print(datetime.now() + timedelta(minutes=10) > datetime.now())
 

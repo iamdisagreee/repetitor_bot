@@ -50,13 +50,13 @@ async def give_student_by_student_id(session: AsyncSession,
 
     return student.scalar()
 
-#Информация для каждого student_id: [student_id = [lesson_on1, lesson_on2, ...], ...]
+#Информация для каждого student_id. {student_id: {week_date1: [12:30, 13:30, ...], week_date2: [..],}, student_id2: ...}
 async def give_lessons_for_day_students(session: AsyncSession):
 
     lessons = (await session.execute(
         select(LessonDay)
         .where(LessonDay.week_date >= date.today())
-        .order_by(LessonDay.lesson_start)
+        .order_by(LessonDay.lesson_start, LessonDay.week_date)
         .options(selectinload(LessonDay.student))
     )).scalars().all()
 
@@ -65,20 +65,28 @@ async def give_lessons_for_day_students(session: AsyncSession):
     for lesson in lessons:
         group_dict[lesson.student_id][lesson.week_date].append(lesson)
 
-    # print(group_dict)
     return group_dict
 
-#Информация для каждого teacher_id: [teacher_id = [lesson_on1, lesson_on2, ...], ...]
+#Информация для каждого teacher_id.
+# {teacher_id1: {student_id1: {week_date1: [12:30, 13:30, ...],
+#                             week_date2: [13:30, 14:00],
+#                             week_date3: [...]
+#                             }
+#               student_id2: {week_date2: [...],}
+#  teacher_id2: {student_id1: ...,
+#                student_id2: ...
+#               }
 async def give_lessons_for_day_teacher(session: AsyncSession):
     lessons = (await session.execute(
         select(LessonDay)
-        .where(LessonDay.week_date == date.today())
-        .order_by(LessonDay.lesson_start)
+        .where(LessonDay.week_date >= date.today())
+        .order_by(LessonDay.lesson_start, LessonDay.week_date)
         .options(selectinload(LessonDay.student).selectinload(Student.teacher))
     )).scalars().all()
 
-    group_dict = defaultdict(list)
+    group_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
 
     for lesson in lessons:
-        group_dict[lesson.student.teacher.teacher_id].append(lesson)
+        group_dict[lesson.student.teacher.teacher_id][lesson.student_id][lesson.week_date].append(lesson)
+
     return group_dict

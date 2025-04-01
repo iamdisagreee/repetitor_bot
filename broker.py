@@ -14,8 +14,8 @@ scheduler = TaskiqScheduler(worker, sources=[scheduler_storage])
 taskiq_aiogram.init(
     worker,
     # This is path to the dispatcher.
-    "test:dp",
+    "main:dp",
     # This is path to the bot instance.
-    "test:bot",
+    "main:bot",
     # You can specify more bots here.
 )
