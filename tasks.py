@@ -13,16 +13,18 @@ from taskiq import Context, TaskiqDepends
 from sqlalchemy import select
 
 from database.taskiq_requests import give_scheduled_payment_verification_students, \
-    give_information_for_day, give_student_by_student_id, give_lessons_for_day_students, give_lessons_for_day_teacher
+    give_information_for_day, give_student_by_student_id, give_lessons_for_day_students, give_lessons_for_day_teacher, \
+    change_student_mailing_status
 from database.teacher_requests import give_all_lessons_day_by_week_day
 from keyboards.taskiq_kb import create_confirmation_day_teacher_kb, create_confirmation_pay_student_kb, \
-    create_notice_lesson_certain_time_student_ok
+    create_notice_lesson_certain_time_student_ok, create_notice_lesson_certain_time_teacher_ok
 from lexicon.lexicon_taskiq import LEXICON_TASKIQ
 from services.services import NUMERIC_DATE, give_date_format_fsm, show_intermediate_information_lesson_day_status, \
     give_time_format_fsm
 from services.services_taskiq import give_data_config_teacher, give_everyday_schedule, create_schedule_like_text, \
     check_is_30_minutes_between, create_scheduled_task, change_to_specified_time, \
-    give_correct_time_schedule_before_lesson, delete_unnecessary_tasks_teacher, give_dictionary_tasks_teacher
+    give_correct_time_schedule_before_lesson, delete_unnecessary_tasks_teacher, give_dictionary_tasks_teacher, \
+    delete_unnecessary_tasks_student, give_dictionary_tasks_student
 
 
 # Ежедневная рассылка для преподавателя и его учеников-должников
@@ -117,17 +119,11 @@ async def student_mailing_lessons(context: Context = TaskiqDepends(),
                                   bot: Bot = TaskiqDepends()):
     await scheduler_storage.startup()
 
-    scheduled_tasks = defaultdict(lambda: defaultdict(list))
-    for task in await scheduler_storage.get_schedules():
-        if task.schedule_id[0:5] == 'b_l_s':
-            student_id, values = list(task.labels.items())[0]
-            lesson_start, week_date = values
-            scheduled_tasks[int(student_id)][give_date_format_fsm(week_date)] \
-                            .append(give_time_format_fsm(lesson_start[:-3]))
+    scheduled_tasks = await give_dictionary_tasks_student()
 
     print(await scheduler_storage.get_schedules())
 
-    async with (context.state.session_pool() as session):
+    async with context.state.session_pool() as session:
         list_students_id = await give_lessons_for_day_students(session)
         # Смотрим расписание каждого студента по student_id
         # {student_id: {week_date: [12:30, 13:30, ...], week_date: [..],}, student_id2: ...}
@@ -136,87 +132,34 @@ async def student_mailing_lessons(context: Context = TaskiqDepends(),
             # {week_date: [12:30, 13:30, ...]}
             for week_date, lessons_day in dict_week_date.items():
 
+
                 # Проверяем, что таска не удалена. Если удалена,
                 # то меняем статус в обе стороны для всех занятий
-                dict_lessons_day = dict((lesson_day.lesson_start, lesson_day)
-                                       for lesson_day in lessons_day)
-
-                # print('Словарь существующих уроков', dict_lessons_day)
-                # print('Список запланированных задач', scheduled_tasks[student_id])
-
-                for task_lesson_start in scheduled_tasks[student_id][week_date]:
-                    # Если такого времени нет, то удаляем задачу и меняем статуса в левую и правую сторону
-                    if task_lesson_start not in dict_lessons_day.keys():
-                        await scheduler_storage.delete_schedule(f'b_l_s_{student_id}_{week_date}_{task_lesson_start}')
-                        # print('Я УДАЛиЛИЛИЛИЛИЛИ')
-                        left_time_lesson = task_lesson_start
-                        right_time_lesson = task_lesson_start
-                        while True:
-                            hour, minute = change_to_specified_time(left_time_lesson, timedelta(minutes=-30))
-                            left_time_lesson = time(hour=hour, minute=minute)
-                            give_result_time = dict_lessons_day.get(left_time_lesson)
-                            # print('GET_L', right_time_lesson, give_result_time)
-                            if give_result_time is not None and give_result_time.student_mailing_status == 1:
-                                give_result_time.student_mailing_status = 0
-                            else:
-                                break
-                        while True:
-                            # print('right_time_lesson', right_time_lesson)
-                            hour, minute = change_to_specified_time(right_time_lesson, timedelta(minutes=30))
-                            right_time_lesson = time(hour=hour, minute=minute)
-                            give_result_time = dict_lessons_day.get(right_time_lesson)
-                            # print('GET_R', right_time_lesson, give_result_time)
-                            if give_result_time is not None and give_result_time.student_mailing_status == 1:
-                                # print("AAA")
-                                give_result_time.student_mailing_status = 0
-                            else:
-                                break
+                await delete_unnecessary_tasks_student(student_id,
+                                                        week_date,
+                                                        lessons_day,
+                                                        scheduled_tasks)
 
                 print([x.student_mailing_status for x in lessons_day])
-                if len(lessons_day) == 1:
-                    if lessons_day[0].student_mailing_status == 0:
-                        until_hour, until_minute = 0, 5
-                        #Устанавливаем для отправления уведомлений
-                        result_sent_time, until_hour, until_minute = \
-                                            give_correct_time_schedule_before_lesson(lessons_day[0].lesson_start,
-                                                                                     week_date,
-                                                                                     until_hour,
-                                                                                     until_minute)
 
-                        # меняем статус и устанавливаем уведомление + добавляем в текущее хранилище
-                        lessons_day[0].student_mailing_status = 1
-                        await scheduler_storage.add_schedule(
-                            create_scheduled_task(task_name='notice_lesson_certain_time_student',
-                                                  labels={str(student_id): [str(lessons_day[0].lesson_start),
-                                                          str(lessons_day[0].week_date)]},
-                                                  kwargs={'student_id': student_id,
-                                                          'lesson_start': str(lessons_day[0].lesson_start),
-                                                          'time_before_lesson': [until_hour, until_minute]
-                                                          },
-                                                  schedule_id=f'b_l_s_{student_id}_{week_date}_{lessons_day[0].lesson_start}',
-                                                  time=result_sent_time + timedelta(seconds=5))
-                                                  # cron='* * * * *',
-                                                  # cron_offset='Europe/Moscow')
-                        )
-                        # scheduled_tasks[student_id].append(lessons_day[0].lesson_start)
-                        print(f'Будет отправлено в {result_sent_time}')
-                        continue
-
+                flag_status = False
+                scheduled_tasks = await give_dictionary_tasks_student()
+                print(scheduled_tasks)
                 for index, lesson_day in enumerate(lessons_day):
-                    until_hour, until_minute = 0, 5
-                    # print("INFO", lesson_day.student_mailing_status, index, lesson_day.lesson_start)
-                    count_lessons = 0
+                    if len(lessons_day) == 1: break
+                    if lesson_day.lesson_start in scheduled_tasks[student_id][week_date] or\
+                            lesson_day.student_mailing_status == 2:
+                        print(f'{lesson_day.lesson_start} уже зареган!')
+                        continue
                     static_index = index
-                    if lesson_day.student_mailing_status == 0 and index + 1 < len(lessons_day):
+                    if  lesson_day.student_mailing_status == 0 and index + 1 < len(lessons_day):
                         for lesson_day_next in lessons_day[static_index + 1:]:
-                            # print("INDEX", index)
                             if check_is_30_minutes_between(lesson_day.lesson_start,
                                                            lesson_day_next.lesson_start):
                                 if lesson_day_next.student_mailing_status == 1:
                                     # удаляем текущее уведомление (lesson_day_next.student_mailing_status)
                                     await scheduler_storage.delete_schedule(
                                         f'b_l_s_{student_id}_{week_date}_{lesson_day_next.lesson_start}')
-                                    # print('Я DELETE')
                                     break
                                 else:
                                     break
@@ -227,63 +170,36 @@ async def student_mailing_lessons(context: Context = TaskiqDepends(),
                         # Если статус равен единице и слева нет соседей, то ставим уведомление
                         if index != 0 and not check_is_30_minutes_between(lessons_day[index-1].lesson_start,
                                                                           lesson_day.lesson_start):
-                            result_sent_time, until_hour, until_minute = \
-                                give_correct_time_schedule_before_lesson(lesson_day.lesson_start,
-                                                                         week_date,
-                                                                         until_hour,
-                                                                         until_minute)
-                            await scheduler_storage.add_schedule(
-                                create_scheduled_task(task_name='notice_lesson_certain_time_student',
-                                                      kwargs={'student_id': student_id,
-                                                              'lesson_start': lesson_day.lesson_start,
-                                                              'time_before_lesson': [until_hour, until_minute]
-                                                              },
-                                                      labels={str(student_id): [str(lesson_day.lesson_start),
-                                                                                str(lesson_day.week_date)]},
-                                                      schedule_id=f'b_l_s_{student_id}_{week_date}_{lesson_day.lesson_start}',
-                                                      time=result_sent_time + timedelta(seconds=5)
-                                                      # cron='* * * * *',
-                                                      # cron_offset='Europe/Moscow'
-                                                      )
-                            )
-                            print(f'Будет отправлено в {result_sent_time}')
-                        continue
+                            flag_status = True
 
                     only_change = False
-
-                    if index != 0 and lessons_day[index - 1].student_mailing_status == 1 and \
+                    if not flag_status and index != 0 and \
+                        lessons_day[index - 1].student_mailing_status == 1 and \
                             check_is_30_minutes_between(lessons_day[index - 1].lesson_start,
                                                         lessons_day[index].lesson_start):
                         only_change = True
-                        # print("ПОПАЛ")
 
-                    lesson_day.student_mailing_status = 1
+                    if lesson_day.student_mailing_status == 0:
+                        lesson_day.student_mailing_status = 1
 
-                    if not only_change:
-
-                        result_sent_time, until_hour, until_minute = \
-                                            give_correct_time_schedule_before_lesson(lesson_day.lesson_start,
-                                                                                     week_date,
-                                                                                     until_hour,
-                                                                                     until_minute)
-                        await scheduler_storage.add_schedule(
-                            create_scheduled_task(task_name='notice_lesson_certain_time_student',
-                                                  kwargs={'student_id': student_id,
-                                                          'lesson_start': lesson_day.lesson_start,
-                                                          'time_before_lesson': [until_hour, until_minute]
-                                                          },
-                                                  labels={str(student_id): [str(lesson_day.lesson_start),
-                                                                            str(lesson_day.week_date)]},
-                                                  schedule_id=f'b_l_s_{student_id}_{week_date}_{lesson_day.lesson_start}',
-                                                  time=result_sent_time + timedelta(seconds=5)
-                                                  # cron='* * * * *',
-                                                  # cron_offset='Europe/Moscow'
-                                                  )
-                        )
-                        print(f'Будет отправлено в {result_sent_time}')
+                    if not only_change or flag_status:
+                        # until_hour, until_minute = lesson_day.student.until_hour, lesson_day.until_minute
+                        until_hour, until_minute = 0, 30
+                        await create_scheduled_task(task_name='notice_lesson_certain_time_student',
+                                                    labels={str(student_id): [lesson_day.lesson_start,
+                                                                              lesson_day.week_date]},
+                                                    kwargs={'student_id': student_id,
+                                                            'lesson_start': lesson_day.lesson_start,
+                                                            'week_date': week_date,
+                                                            },
+                                                    schedule_id=f'b_l_s_{student_id}_{week_date}_{lesson_day.lesson_start}',
+                                                    until_hour=until_hour,
+                                                    until_minute=until_minute,
+                                                    lesson_start=lesson_day.lesson_start,
+                                                    week_date=week_date
+                                                    )
 
         await session.commit()
-    # print(scheduled_tasks)
     for x in await scheduler_storage.get_schedules():
         print(x.schedule_id)
     await scheduler_storage.shutdown()
@@ -293,19 +209,25 @@ async def student_mailing_lessons(context: Context = TaskiqDepends(),
 @worker.task(task_name='notice_lesson_certain_time_student')
 async def notice_lesson_certain_time_student(student_id: int,
                                              lesson_start: time,
-                                             time_before_lesson: list,
+                                             week_date: date,
+                                             time_before_lesson,
                                              context: Context = TaskiqDepends(),
                                              bot: Bot = TaskiqDepends()):
+    dt_res = datetime(year=week_date.year, month=week_date.month, day=week_date.day,
+                      hour=lesson_start.hour, minute=lesson_start.minute)
 
-    await bot.send_message(chat_id=student_id, text=f'До занятия: {time_before_lesson[0]}'
-                                                    f' ч. {time_before_lesson[1]} мин.\n'
-                                                    f'Начало: {lesson_start.strftime("%H:%M")}',
-                           reply_markup=create_notice_lesson_certain_time_student_ok())
+    await bot.send_message(chat_id=student_id, text=LEXICON_TASKIQ['time_before_lesson_student']
+    .format(*time_before_lesson, dt_res.strftime("%m.%d %H:%M")),
+                           reply_markup=create_notice_lesson_certain_time_student_ok()
+                           )
 
-    #После выполнения удаляем задачу
-    # await scheduler_storage.startup()
-    # await scheduler_storage.delete_schedule(f'b_l_{student_id}_{lesson_start.strftime("%H:%M")}')
-
+    # меняем статус - уведомление отправили
+    async with context.state.session_pool() as session:
+        await change_student_mailing_status(session=session,
+                                            status=2,
+                                            student_id=student_id,
+                                            week_date=week_date,
+                                            lesson_start=lesson_start)
 
 
 # Уведомление о занятии за какое-то время до начала для репетитора
@@ -341,41 +263,21 @@ async def teacher_mailing_lessons(context: Context = TaskiqDepends(),
                                                            week_date,
                                                            lessons_day,
                                                            scheduled_tasks)
-
-
-                    if len(lessons_day) == 1 and lessons_day[0].student_mailing_status == 0:
-                        #Тестовый вариант выборки времени
-                        until_hour, until_minute = 5, 5
-                        lessons_day[0].teacher_mailing_status = 1
-                        await create_scheduled_task(task_name='notice_lesson_certain_time_teacher',
-                                                    labels={str(teacher_id): [lessons_day[0].student_id,
-                                                                         lessons_day[0].lesson_start,
-                                                                         lessons_day[0].week_date]},
-                                                    kwargs={'teacher_id': teacher_id,
-                                                            'lesson_start': lessons_day[0].lesson_start,
-                                                            'time_before_lesson': [until_hour, until_minute],
-                                                            'student_name': lessons_day[0].student.name
-                                                            },
-                                                    schedule_id=f'b_l_t_{teacher_id}_{week_date}'
-                                                                f'_{lessons_day[0].lesson_start}',
-                                                    until_hour=until_hour,
-                                                    until_minute=until_minute,
-                                                    lesson_start=lessons_day[0].lesson_start,
-                                                    week_date=week_date
-                                                    )
-                        continue
-
-
+                    flag_status = False
+                    scheduled_tasks = await give_dictionary_tasks_teacher()
+                    print(scheduled_tasks)
                     for index, lesson_day in enumerate(lessons_day):
                         # Тестовый вариант выборки времени
-                        until_hour, until_minute = 5, 5
+                        if len(lessons_day) == 1: break
+                        if lesson_day.lesson_start in scheduled_tasks[teacher_id][student_id][week_date] or \
+                                lesson_day.teacher_mailing_status == 2: continue
                         static_index = index
 
                         if lesson_day.student_mailing_status == 0 and index + 1 < len(lessons_day):
                             for lesson_day_next in lessons_day[static_index + 1:]:
                                 if check_is_30_minutes_between(lesson_day.lesson_start,
                                                                lesson_day_next.lesson_start):
-                                    if lesson_day_next.student_mailing_status == 1:
+                                    if lesson_day_next.teacher_mailing_status == 1:
                                         # удаляем текущее уведомление (lesson_day_next.student_mailing_status)
                                         await scheduler_storage.delete_schedule(
                                             f'b_l_t_{teacher_id}_{week_date}_{lesson_day_next.lesson_start}')
@@ -385,39 +287,24 @@ async def teacher_mailing_lessons(context: Context = TaskiqDepends(),
                                 else:
                                     break
 
-
                         if lesson_day.student_mailing_status == 1 and index != 0 \
                                 and not check_is_30_minutes_between(lessons_day[index-1].lesson_start,
                                                                               lesson_day.lesson_start):
-
-                            await create_scheduled_task(task_name='notice_lesson_certain_time_teacher',
-                                                        labels={str(teacher_id): [lesson_day.student_id,
-                                                                             lesson_day.lesson_start,
-                                                                             lesson_day.week_date]},
-                                                        kwargs={'teacher_id': teacher_id,
-                                                                'lesson_start': lesson_day.lesson_start,
-                                                                'time_before_lesson': [until_hour, until_minute],
-                                                                'student_name': lesson_day.student.name
-                                                                },
-                                                        schedule_id=f'b_l_t_{teacher_id}_{week_date}'
-                                                                    f'_{lesson_day.lesson_start}',
-                                                        until_hour=until_hour,
-                                                        until_minute=until_minute,
-                                                        lesson_start=lesson_day.lesson_start,
-                                                        week_date=week_date
-                                                        )
-                            continue
+                            flag_status = True
 
 
                         only_change = False
-                        if index != 0 and lessons_day[index - 1].student_mailing_status == 1 and \
+                        if not flag_status and index != 0 and \
+                                lessons_day[index - 1].student_mailing_status == 1 and \
                                 check_is_30_minutes_between(lessons_day[index - 1].lesson_start,
                                                             lessons_day[index].lesson_start):
                             only_change = True
 
-                        lesson_day.teacher_mailing_status = 1
+                        if lesson_day.teacher_mailing_status == 0:
+                            lesson_day.teacher_mailing_status = 1
 
-                        if not only_change:
+                        if not only_change or flag_status:
+                            until_hour, until_minute = 5, 5
                             await create_scheduled_task(task_name='notice_lesson_certain_time_teacher',
                                                         labels={str(teacher_id): [lesson_day.student_id,
                                                                              lesson_day.lesson_start,
@@ -448,4 +335,5 @@ async def notice_lesson_certain_time_teacher(teacher_id: int,
                                              time_before_lesson: list,
                                              student_name: str,
                                              bot: Bot = TaskiqDepends()):
-    await bot.send_message(chat_id=teacher_id, text=f'{lesson_start} {student_name}')
+    await bot.send_message(chat_id=teacher_id, text=f'{lesson_start} {student_name}',
+                           reply_markup=create_notice_lesson_certain_time_teacher_ok())

@@ -1,5 +1,5 @@
 from collections import defaultdict
-from datetime import datetime, date
+from datetime import datetime, date, time
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, not_, func
@@ -90,3 +90,25 @@ async def give_lessons_for_day_teacher(session: AsyncSession):
         group_dict[lesson.student.teacher.teacher_id][lesson.student_id][lesson.week_date].append(lesson)
 
     return group_dict
+
+
+# Меняем статус отправки у студента на "2" после отправки сообщения
+async def change_student_mailing_status(session: AsyncSession,
+                                        status: int,
+                                        student_id: int,
+                                        week_date: date,
+                                        lesson_start: time):
+    lesson_day = (await session.execute(
+        select(LessonDay)
+        .where(
+            and_(
+                LessonDay.student_id == student_id,
+                LessonDay.week_date == week_date,
+                LessonDay.lesson_start == lesson_start
+            )
+        )
+    )).scalar()
+    # print(lesson_day)
+    lesson_day.student_mailing_status = 2
+
+    await session.commit()

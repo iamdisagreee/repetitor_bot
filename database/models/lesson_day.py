@@ -1,7 +1,7 @@
 from datetime import datetime, date, time
 from uuid import UUID
 
-from sqlalchemy import BigInteger, Date, Uuid, ForeignKey, Time, text, Boolean, ForeignKeyConstraint, Uuid
+from sqlalchemy import BigInteger, Date, Uuid, ForeignKey, Time, text, Boolean, ForeignKeyConstraint, Uuid, Integer
 from sqlalchemy.orm import mapped_column, Mapped, relationship
 from sqlalchemy.sql import expression
 
@@ -46,11 +46,11 @@ class LessonDay(Base):
                                          server_default=expression.false(),
                                          )
 
-    student_mailing_status: Mapped[bool] = mapped_column(Boolean,
-                                                         server_default=expression.false())
+    student_mailing_status: Mapped[int] = mapped_column(Integer,
+                                                         server_default='0')
 
-    teacher_mailing_status: Mapped[bool] = mapped_column(Boolean,
-                                                         server_default=expression.false())
+    teacher_mailing_status: Mapped[int] = mapped_column(Integer,
+                                                         server_default='0')
 
     __table_args__ = (ForeignKeyConstraint(['week_id', 'week_date', 'teacher_id'],
                                            [lesson_week.LessonWeek.week_id,

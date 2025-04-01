@@ -52,7 +52,7 @@ async def main():
     # Создаем асинхронный движок sqlalchemy
     engine = create_async_engine(url=config.tgbot.postgresql,
                                  echo=False)
-
+    #
     # async with engine.begin() as connection:
     #      await connection.run_sync(Base.metadata.drop_all)
     #      print("Удалил")
@@ -79,7 +79,7 @@ async def main():
     await worker.startup()
 
     await scheduler_storage.startup()
-    await teacher_mailing_lessons.kiq()
+    await student_mailing_lessons.kiq()
     # await scheduled_payment_verification.kiq()
     # Логика настройки проверки оплаты в 23:50 по мск
     # await scheduler_storage.add_schedule(

@@ -132,7 +132,6 @@ def give_correct_time_schedule_before_lesson(lesson_start: time, week_date: date
     dt_lesson = datetime(year=week_date.year, month=week_date.month, day=week_date.day,
                          hour=lesson_start.hour, minute=lesson_start.minute)
     # Случай, когда время уведомления уже наступило. Тогда отправляем текущее кол-во минут/часов до занятия
-    print('!', now, until_time, sum_now_until, dt_lesson, sep=' | ')
     if sum_now_until >= dt_lesson:
         result_sent_time_td = dt_lesson - now
         result_sent_time = dt_lesson - result_sent_time_td
@@ -141,7 +140,7 @@ def give_correct_time_schedule_before_lesson(lesson_start: time, week_date: date
     # Если все же заданное ограничение по времени сохраняется
     else:
         result_sent_time = dt_lesson - until_time
-
+    print('!', now, until_time, sum_now_until, dt_lesson, until_hour, until_minute, sep=' | ')
     timezone_set = ZoneInfo('Europe/Moscow')
     return result_sent_time.replace(tzinfo=timezone_set), until_hour, until_minute
 
@@ -175,6 +174,8 @@ async def create_scheduled_task(task_name: str,
     if kwargs is None:
         kwargs = dict()
 
+    kwargs['time_before_lesson'] = [until_hour, until_minute]
+
     task = ScheduledTask(task_name=task_name,
                          labels=labels,
                          args=args,
@@ -187,6 +188,16 @@ async def create_scheduled_task(task_name: str,
     print(f'Будет отправлено в {result_sent_time}')
     await scheduler_storage.add_schedule(task)
 
+# Возвращаем словарь тасок для студента
+async def give_dictionary_tasks_student():
+    scheduled_tasks = defaultdict(lambda: defaultdict(list))
+    for task in await scheduler_storage.get_schedules():
+        if task.schedule_id[0:5] == 'b_l_s':
+            student_id, values = list(task.labels.items())[0]
+            lesson_start, week_date = values
+            scheduled_tasks[int(student_id)][give_date_format_fsm(week_date)] \
+                            .append(give_time_format_fsm(lesson_start[:-3]))
+    return scheduled_tasks
 
 # Возвращаем словарь тасок для учителя
 async def give_dictionary_tasks_teacher():
@@ -199,8 +210,40 @@ async def give_dictionary_tasks_teacher():
                 .append(give_time_format_fsm(lesson_start[:-3]))
     return scheduled_tasks
 
+# Удаляем отменившиеся задачи для студента
+async def delete_unnecessary_tasks_student(student_id,
+                                           week_date,
+                                           lessons_day,
+                                           scheduled_tasks):
+    # Проверяем, что таска не удалена. Если удалена,
+    # то меняем статус в обе стороны для всех занятий
+    dict_lessons_day = dict((lesson_day.lesson_start, lesson_day)
+                            for lesson_day in lessons_day)
 
-# Удаляем неактуальные задачи для учителя
+    for task_lesson_start in scheduled_tasks[student_id][week_date]:
+        # Если такого времени нет, то удаляем задачу и меняем статуса в левую и правую сторону
+        if task_lesson_start not in dict_lessons_day.keys():
+            await scheduler_storage.delete_schedule(f'b_l_s_{student_id}_{week_date}_{task_lesson_start}')
+            left_time_lesson = task_lesson_start
+            right_time_lesson = task_lesson_start
+            while True:
+                hour, minute = change_to_specified_time(left_time_lesson, timedelta(minutes=-30))
+                left_time_lesson = time(hour=hour, minute=minute)
+                give_result_time = dict_lessons_day.get(left_time_lesson)
+                if give_result_time is not None and give_result_time.student_mailing_status == 1:
+                    give_result_time.student_mailing_status = 0
+                else:
+                    break
+            while True:
+                hour, minute = change_to_specified_time(right_time_lesson, timedelta(minutes=30))
+                right_time_lesson = time(hour=hour, minute=minute)
+                give_result_time = dict_lessons_day.get(right_time_lesson)
+                if give_result_time is not None and give_result_time.student_mailing_status == 1:
+                    give_result_time.student_mailing_status = 0
+                else:
+                    break
+
+# Удаляем отменившиеся задачи для учителя
 async def delete_unnecessary_tasks_teacher(teacher_id,
                                            student_id,
                                            week_date,
@@ -209,13 +252,9 @@ async def delete_unnecessary_tasks_teacher(teacher_id,
 
     dict_lessons_day = dict((lesson_day.lesson_start, lesson_day)
                             for lesson_day in lessons_day)
-    # print(dict_lessons_day, scheduled_tasks)
-    # print('times', scheduled_tasks[teacher_id][student_id][week_date])
-    # print(teacher_id, student_id, week_date)
+
     for task_lesson_start in scheduled_tasks[teacher_id][student_id][week_date]:
         if task_lesson_start not in dict_lessons_day.keys():
-            # print(f'b_l_t_{teacher_id}_{week_date}'
-            #                                         f'_{task_lesson_start}')
             await scheduler_storage.delete_schedule(f'b_l_t_{teacher_id}_{week_date}'
                                                     f'_{task_lesson_start}')
             left_time_lesson = task_lesson_start

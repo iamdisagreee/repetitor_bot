@@ -41,3 +41,11 @@ def create_notice_lesson_certain_time_student_ok():
                                   callback_data='notice_lesson_certain_time_student')]
         ]
     )
+
+def create_notice_lesson_certain_time_teacher_ok():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_TASKIQ['ok'],
+                                  callback_data='notice_lesson_certain_time_teacher')]
+        ]
+    )
