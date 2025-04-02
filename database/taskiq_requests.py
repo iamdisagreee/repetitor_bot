@@ -108,7 +108,27 @@ async def change_student_mailing_status(session: AsyncSession,
             )
         )
     )).scalar()
-    # print(lesson_day)
-    lesson_day.student_mailing_status = 2
+    lesson_day.student_mailing_status = status
+
+    await session.commit()
+
+
+# Меняем статус отправки у учителя на "2" после отправки сообщения
+async def change_teacher_mailing_status(session: AsyncSession,
+                                        status: int,
+                                        teacher_id: int,
+                                        week_date: date,
+                                        lesson_start: time):
+    lesson_day = (await session.execute(
+        select(LessonDay)
+        .where(
+            and_(
+                LessonDay.teacher_id == teacher_id,
+                LessonDay.week_date == week_date,
+                LessonDay.lesson_start == lesson_start
+            )
+        )
+    )).scalar()
+    lesson_day.teacher_mailing_status = status
 
     await session.commit()

@@ -14,7 +14,7 @@ from sqlalchemy import select
 
 from database.taskiq_requests import give_scheduled_payment_verification_students, \
     give_information_for_day, give_student_by_student_id, give_lessons_for_day_students, give_lessons_for_day_teacher, \
-    change_student_mailing_status
+    change_student_mailing_status, change_teacher_mailing_status
 from database.teacher_requests import give_all_lessons_day_by_week_day
 from keyboards.taskiq_kb import create_confirmation_day_teacher_kb, create_confirmation_pay_student_kb, \
     create_notice_lesson_certain_time_student_ok, create_notice_lesson_certain_time_teacher_ok
@@ -98,7 +98,7 @@ async def daily_newsletter_teacher(teacher_id: int,
     print('Рассылка для учеников окончена!')
 
 
-# Высылаем расписание каждый день в __переданное время__
+# Высылаем расписание каждый день в __переданное время__ для учителя
 @worker.task(task_name='activities_day_teacher')
 async def activities_day_teacher(teacher_id: int,
                                  context: Context = TaskiqDepends(),
@@ -121,7 +121,7 @@ async def student_mailing_lessons(context: Context = TaskiqDepends(),
 
     scheduled_tasks = await give_dictionary_tasks_student()
 
-    print(await scheduler_storage.get_schedules())
+    # print(await scheduler_storage.get_schedules())
 
     async with context.state.session_pool() as session:
         list_students_id = await give_lessons_for_day_students(session)
@@ -140,7 +140,7 @@ async def student_mailing_lessons(context: Context = TaskiqDepends(),
                                                         lessons_day,
                                                         scheduled_tasks)
 
-                print([x.student_mailing_status for x in lessons_day])
+                # print([x.student_mailing_status for x in lessons_day])
 
                 flag_status = False
                 scheduled_tasks = await give_dictionary_tasks_student()
@@ -149,7 +149,7 @@ async def student_mailing_lessons(context: Context = TaskiqDepends(),
                     if len(lessons_day) == 1: break
                     if lesson_day.lesson_start in scheduled_tasks[student_id][week_date] or\
                             lesson_day.student_mailing_status == 2:
-                        print(f'{lesson_day.lesson_start} уже зареган!')
+                        print(f'STUDENT, {lesson_day.lesson_start} уже зареган!')
                         continue
                     static_index = index
                     if  lesson_day.student_mailing_status == 0 and index + 1 < len(lessons_day):
@@ -184,7 +184,7 @@ async def student_mailing_lessons(context: Context = TaskiqDepends(),
 
                     if not only_change or flag_status:
                         # until_hour, until_minute = lesson_day.student.until_hour, lesson_day.until_minute
-                        until_hour, until_minute = 0, 30
+                        # until_hour, until_minute = 0, 30
                         await create_scheduled_task(task_name='notice_lesson_certain_time_student',
                                                     labels={str(student_id): [lesson_day.lesson_start,
                                                                               lesson_day.week_date]},
@@ -192,9 +192,10 @@ async def student_mailing_lessons(context: Context = TaskiqDepends(),
                                                             'lesson_start': lesson_day.lesson_start,
                                                             'week_date': week_date,
                                                             },
-                                                    schedule_id=f'b_l_s_{student_id}_{week_date}_{lesson_day.lesson_start}',
-                                                    until_hour=until_hour,
-                                                    until_minute=until_minute,
+                                                    schedule_id=f'b_l_s_{student_id}_{week_date}_'
+                                                                f'{lesson_day.lesson_start}',
+                                                    until_hour=lesson_day.student.until_hour_notification,
+                                                    until_minute=lesson_day.student.until_minute_notification,
                                                     lesson_start=lesson_day.lesson_start,
                                                     week_date=week_date
                                                     )
@@ -265,12 +266,14 @@ async def teacher_mailing_lessons(context: Context = TaskiqDepends(),
                                                            scheduled_tasks)
                     flag_status = False
                     scheduled_tasks = await give_dictionary_tasks_teacher()
-                    print(scheduled_tasks)
+                    # print(scheduled_tasks)
                     for index, lesson_day in enumerate(lessons_day):
                         # Тестовый вариант выборки времени
                         if len(lessons_day) == 1: break
                         if lesson_day.lesson_start in scheduled_tasks[teacher_id][student_id][week_date] or \
-                                lesson_day.teacher_mailing_status == 2: continue
+                                lesson_day.teacher_mailing_status == 2:
+                            print(f'TEACHER, {lesson_day.lesson_start} уже зареган!')
+                            continue
                         static_index = index
 
                         if lesson_day.student_mailing_status == 0 and index + 1 < len(lessons_day):
@@ -304,20 +307,22 @@ async def teacher_mailing_lessons(context: Context = TaskiqDepends(),
                             lesson_day.teacher_mailing_status = 1
 
                         if not only_change or flag_status:
-                            until_hour, until_minute = 5, 5
+                            # until_hour, until_minute = 0, 30
                             await create_scheduled_task(task_name='notice_lesson_certain_time_teacher',
                                                         labels={str(teacher_id): [lesson_day.student_id,
                                                                              lesson_day.lesson_start,
                                                                              lesson_day.week_date]},
                                                         kwargs={'teacher_id': teacher_id,
                                                                 'lesson_start': lesson_day.lesson_start,
-                                                                'time_before_lesson': [until_hour, until_minute],
-                                                                'student_name': lesson_day.student.name
+                                                                'week_date': week_date,
+                                                                'student_info': [lesson_day.student.name,
+                                                                                lesson_day.student.surname,
+                                                                                 lesson_day.student.subject]
                                                                 },
                                                         schedule_id=f'b_l_t_{teacher_id}_{week_date}'
                                                                     f'_{lesson_day.lesson_start}',
-                                                        until_hour=until_hour,
-                                                        until_minute=until_minute,
+                                                        until_hour=lesson_day.student.teacher.until_minute_notification,
+                                                        until_minute=lesson_day.student.teacher.until_hour_notification,
                                                         lesson_start=lesson_day.lesson_start,
                                                         week_date=week_date
                                                         )
@@ -327,13 +332,25 @@ async def teacher_mailing_lessons(context: Context = TaskiqDepends(),
         print(x.schedule_id)
     await scheduler_storage.shutdown()
 
-
-
 @worker.task(task_name='notice_lesson_certain_time_teacher')
 async def notice_lesson_certain_time_teacher(teacher_id: int,
                                              lesson_start: time,
+                                             week_date: date,
                                              time_before_lesson: list,
-                                             student_name: str,
-                                             bot: Bot = TaskiqDepends()):
-    await bot.send_message(chat_id=teacher_id, text=f'{lesson_start} {student_name}',
+                                             student_info,
+                                             bot: Bot = TaskiqDepends(),
+                                             context: Context = TaskiqDepends()):
+
+    dt_res = datetime(year=week_date.year, month=week_date.month, day=week_date.day,
+                      hour=lesson_start.hour, minute=lesson_start.minute)
+
+    await bot.send_message(chat_id=teacher_id, text=LEXICON_TASKIQ['time_before_lesson_teacher']
+                           .format(*student_info, *time_before_lesson, dt_res.strftime("%m.%d %H:%M")),
                            reply_markup=create_notice_lesson_certain_time_teacher_ok())
+
+    async with context.state.session_pool() as session:
+        await change_teacher_mailing_status(session,
+                                            2,
+                                            teacher_id,
+                                            week_date,
+                                            lesson_start)

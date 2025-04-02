@@ -1,4 +1,4 @@
-from datetime import date, datetime
+from datetime import date, datetime, time
 
 from sqlalchemy import BigInteger, String, DateTime, func, ForeignKey, Time, Integer, text
 from sqlalchemy.orm import mapped_column, Mapped, relationship
@@ -16,6 +16,10 @@ class Teacher(Base):
     phone: Mapped[str] = mapped_column(String)
     bank: Mapped[str] = mapped_column(String)
     penalty: Mapped[int] = mapped_column(Integer)
+    until_hour_notification: Mapped[int] = mapped_column(Integer)
+    until_minute_notification: Mapped[int] = mapped_column(Integer)
+    daily_schedule_mailing_time: Mapped[time] = mapped_column(Time)
+    daily_report_mailing_time: Mapped[time] = mapped_column(Time)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),
