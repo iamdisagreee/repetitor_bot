@@ -18,7 +18,6 @@ NUMBER_DAYS = 7
 NUMBER_ENTRIES = 9
 COUNT_BAN = 3
 
-
 def give_list_with_days(get_date: datetime):
     result_date = []
 

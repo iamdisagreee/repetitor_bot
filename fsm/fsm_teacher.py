@@ -7,6 +7,10 @@ class FSMRegistrationTeacherForm(StatesGroup):
     fill_phone = State()
     fill_bank = State()
     fill_penalty = State()
+    fill_until_time_notification = State()
+    fill_daily_schedule_mailing_time = State()
+    fill_daily_report_mailing_time = State()
+    fill_days_cancellation_notification = State()
 
 
 class FSMRegistrationLessonWeek(StatesGroup):

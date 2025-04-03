@@ -54,6 +54,21 @@ class IsPenaltyCorrectInput(BaseFilter):
         return message.text.isdigit() and int(message.text) >= 0 \
     and int(message.text) == 0 #Отключаем систему пенальти
 
+# Правильно ли введено время до уведомления о занятии
+class IsUntilTimeNotification(BaseFilter):
+    async def __call__(self, message: Message):
+        return re.fullmatch(r'[0-9][0-9]:[0-5][0-9]', message.text)
+
+# Правильно ли введено время до уведомления о занятии
+class IsDailyScheduleMailingTime(BaseFilter):
+    async def __call__(self, message: Message):
+        return re.fullmatch(r'^0[0-9]:[0-5][0-9]|^1[0-9]:[0-5][0-9]|'
+                            r'^2[0-3]:[0-5][0-9]', message.text)
+
+class IsDailyReportMailingTime(BaseFilter):
+    async def __call__(self, message: Message):
+        return re.fullmatch(r'^0[0-9]:[0-5][0-9]|^1[0-9]:[0-5][0-9]|'
+                            r'^2[0-3]:[0-5][0-9]', message.text)
 
 # Фильтр, который отлавливает апдейты, когда мы нажимаем на один из дней расписания
 class FindNextSevenDaysFromKeyboard(BaseFilter):

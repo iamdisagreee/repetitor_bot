@@ -28,6 +28,10 @@ class EmptyRemoveFieldCallbackFactory(CallbackData, prefix='plug'):
 class ShowDaysOfScheduleCallbackFactory(CallbackData, prefix='schedule'):
     week_date: str
 
+class RemoveDayOfScheduleCallbackFactory(CallbackData, prefix='schedule', sep='.'):
+    week_date: str
+    lesson_on: str
+    lesson_off: str
 
 class StartEndLessonDayCallbackFactory(CallbackData, prefix='start_end_lesson', sep='-'):
     lesson_on: str

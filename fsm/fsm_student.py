@@ -12,3 +12,4 @@ class FSMRegistrationStudentForm(StatesGroup):
     fill_subject = State()
     fill_teacher = State()
     fill_price = State()
+    fill_until_time_notification = State()

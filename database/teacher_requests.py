@@ -8,6 +8,7 @@ from database import LessonDay, Student, AccessStudent
 from database.models import Penalty
 from database.models.lesson_week import LessonWeek
 from database.models.teacher import Teacher
+from services.services import give_time_format_fsm
 
 
 # Добавляем репетитора в базу данных
@@ -17,13 +18,25 @@ async def command_add_teacher(session: AsyncSession,
                               surname: str,
                               phone: str,
                               bank: str,
-                              penalty: int):
+                              penalty: int,
+                              until_time_notification: str,
+                              daily_schedule_mailing_time: str,
+                              daily_report_mailing_time: str,
+                              days_cancellation_notification: int,
+                              ):
+    until_hour_notification, until_minute_notification = \
+                                    [int(el) for el in until_time_notification.split(':')]
     teacher = Teacher(teacher_id=teacher_id,
                       name=name,
                       surname=surname,
                       phone=phone,
                       bank=bank,
-                      penalty=penalty)
+                      penalty=penalty,
+                      until_hour_notification=until_hour_notification,
+                      until_minute_notification=until_minute_notification,
+                      daily_schedule_mailing_time=give_time_format_fsm(daily_schedule_mailing_time),
+                      daily_report_mailing_time=give_time_format_fsm(daily_report_mailing_time),
+                      days_cancellation_notification=days_cancellation_notification)
 
     await session.merge(teacher)
     await session.commit()

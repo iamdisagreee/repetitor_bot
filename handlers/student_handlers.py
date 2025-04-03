@@ -13,25 +13,27 @@ from sqlalchemy import select
 
 from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
-    StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory, InformationLessonCallbackFactory
+    StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory, InformationLessonCallbackFactory, \
+    RemoveDayOfScheduleCallbackFactory
 from callback_factory.taskiq_factories import InformationLessonWithDeleteCallbackFactory
 from database import Student, LessonDay
 from database.student_requests import command_get_all_teachers, command_add_students, give_lessons_week_for_day, \
     add_lesson_day, give_teacher_by_student_id, give_all_busy_time_intervals, \
     give_all_lessons_for_day, remove_lesson_day, give_week_id_by_teacher_id, \
-    give_information_of_lesson, delete_student_profile, give_students_penalty
+    give_information_of_lesson, delete_student_profile, give_students_penalty, give_all_information_teacher
 from filters.student_filters import IsStudentInDatabase, IsInputFieldAlpha, \
     FindNextSevenDaysFromKeyboard, IsMoveRightAddMenu, IsMoveLeftMenu, IsTeacherDidSlots, IsStudentChooseSlots, \
     IsMoveRightRemoveMenu, IsLessonsInChoseDay, IsTimeNotExpired, IsFreeSlots, IsTeacherDidSystemPenalties, \
     IsStudentHasPenalties, StudentStartFilter, IsRightClassCourse, IsRightPrice, \
-    IsNotAlreadyConfirmed
+    IsNotAlreadyConfirmed, IsUntilTimeNotification
 from fsm.fsm_student import FSMRegistrationStudentForm
 from keyboards.everyone_kb import create_start_kb
 from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, create_level_choice_kb, \
     create_back_to_entrance_kb, create_authorization_kb, show_next_seven_days_settings_kb, create_menu_add_remove_kb, \
     create_choose_time_student_kb, create_delete_lessons_menu, show_next_seven_days_schedule_kb, all_lessons_for_day_kb, \
     create_button_for_back_to_all_lessons_day, create_settings_profile_kb, create_information_penalties, \
-    create_back_to_settings_student_kb, create_confirm_payment_teacher_kb
+    create_back_to_settings_student_kb, create_confirm_payment_teacher_kb, \
+    create_ok_remove_day_schedule_student_kb
 from lexicon.lexicon_all import LEXICON_ALL
 from lexicon.lexicon_student import LEXICON_STUDENT
 from services.services import give_list_with_days, create_choose_time_student, give_date_format_fsm, \
@@ -152,23 +154,26 @@ async def process_teacher_sent(callback: CallbackQuery, state: FSMContext):
     await state.set_state(FSMRegistrationStudentForm.fill_price)
 
 
-# Поймали стоимость -> отправляем данные на сервер о студенте
+# Поймали стоимость -> просим ввести время, за которое будет приходить уведомление о занятии (ЧАСЫ:МИНУТЫ)
 @router.message(StateFilter(FSMRegistrationStudentForm.fill_price), IsRightPrice())
-async def process_price_sent(message: Message, session: AsyncSession, state: FSMContext):
+async def process_price_sent(message: Message, state: FSMContext):
     await state.update_data(price=message.text)
+    await message.answer(text=LEXICON_STUDENT['fill_until_time_notification'])
+    await state.set_state(FSMRegistrationStudentForm.fill_until_time_notification)
 
+# Поймали время, за которое будет приходить уведомление о занятии ->
+# передаем данные, чистим состояние
+@router.message(StateFilter(FSMRegistrationStudentForm.fill_until_time_notification), IsUntilTimeNotification())
+async def process_until_time_notification_sent(message: Message, session: AsyncSession, state: FSMContext):
+    await state.update_data(until_time_notification=message.text)
     student_form = await state.get_data()
-    # Добавляем ученика в бд и проверяем, поменял ли он репетитора
-    # Если да, то чистим все его записи
     await command_add_students(session,
-                               message.from_user.id,
-                               **student_form)
-
+                                message.from_user.id,
+                                **student_form)
     await state.clear()
 
     await message.answer(text=LEXICON_STUDENT['access_registration_profile'],
-                         reply_markup=create_back_to_entrance_kb())
-
+                             reply_markup=create_back_to_entrance_kb())
 
 ###Неправильные фильтры для анкеты
 # Имя неправильного формата!
@@ -221,6 +226,10 @@ async def process_subject_sent(message: Message):
 async def process_price_sent(message: Message):
     await message.answer(LEXICON_STUDENT['not_fill_price'])
 
+# Неправильное время, за которое будет приходить уведомление о занятии
+@router.message(StateFilter(FSMRegistrationStudentForm.fill_until_time_notification))
+async def process_not_until_time_notification(message: Message):
+    await message.answer(LEXICON_STUDENT['not_fill_until_time_notification'])
 
 # Случай, когда ученик находится в бд, но хочет зарегистрироваться
 @router.callback_query(F.data == 'reg_student', IsStudentInDatabase())
@@ -648,6 +657,26 @@ async def process_sent_student_payment_confirmation(callback: CallbackQuery, tea
                            )
     await callback.answer(text=LEXICON_STUDENT['student_payment_confirmation_good'])
     await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
+
+
+######################################### Нажимаем __ОТМЕНИТЬ__ занятие ######################################
+@router.callback_query(RemoveDayOfScheduleCallbackFactory.filter())
+async def process_remove_lesson_student(callback: CallbackQuery, bot: Bot, session: AsyncSession,
+                                        callback_data: RemoveDayOfScheduleCallbackFactory):
+    student = await give_teacher_by_student_id(session, callback.from_user.id)
+    lesson_on_time = give_time_format_fsm(callback_data.lesson_on)
+    lesson_off_time = give_time_format_fsm(callback_data.lesson_off)
+    week_date_date = give_date_format_fsm(callback_data.week_date)
+    await bot.send_message(chat_id=student.teacher_id, text=LEXICON_STUDENT['student_cancellation_lesson']
+                           .format(student.name, student.surname, week_date_date.strftime("%m.%d"),
+                                   NUMERIC_DATE[date(year=week_date_date.year,
+                                                     month=week_date_date.month,
+                                                     day=week_date_date.day).isoweekday()],
+                                   lesson_on_time.strftime("%H:%M"),
+                                   lesson_off_time.strftime("%H:%M")),
+                           reply_markup=create_ok_remove_day_schedule_student_kb()
+                           )
+
 
 
 ###################################### Кнопка НАСТРОЙКИ #############################################

@@ -8,6 +8,7 @@ from database import Student, LessonDay
 from database.models import Penalty
 from database.models.lesson_week import LessonWeek
 from database.models.teacher import Teacher
+from services.services import give_time_format_fsm
 
 
 # Получаем список всех учителей
@@ -30,9 +31,11 @@ async def command_add_students(session: AsyncSession,
                                subject,
                                teacher_id: str,
                                price,
+                               until_time_notification,
                                class_learning=None,
                                course_learning=None,
                                ):
+    until_minute_notification, until_hour_notification = [int(el) for el in until_time_notification.split(':33')]
     student = Student(student_id=student_id,
                       name=name,
                       surname=surname,
@@ -42,7 +45,9 @@ async def command_add_students(session: AsyncSession,
                       course_learning=int(course_learning) if course_learning else course_learning,
                       subject=subject,
                       teacher_id=int(teacher_id),
-                      price=int(price)
+                      price=int(price),
+                      until_hour_notification=until_hour_notification,
+                      until_minute_notification=until_minute_notification
                       )
     # Получаем teacher_id, если он есть. И сравниваем с добавляемым
     # Если он изменился, то чистим все занятия

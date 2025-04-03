@@ -1,3 +1,4 @@
+import re
 import time
 from datetime import timedelta, datetime
 
@@ -55,6 +56,10 @@ class IsRightPrice(BaseFilter):
     async def __call__(self, message):
         return message.text.isdigit() and int(message.text) >= 0
 
+
+class IsUntilTimeNotification(BaseFilter):
+    async def __call__(self, message: Message):
+        return re.fullmatch(r'[0-9][0-9]:[0-5][0-9]', message.text)
 
 class FindNextSevenDaysFromKeyboard(BaseFilter):
     async def __call__(self, callback: CallbackQuery):

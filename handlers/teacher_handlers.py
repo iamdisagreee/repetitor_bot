@@ -33,7 +33,7 @@ from filters.teacher_filters import IsTeacherInDatabase, \
     IsSomethingToShowSchedule, \
     IsPhoneCorrectInput, IsBankCorrectInput, IsPenaltyCorrectInput, IsInputTimeLongerThanNow, \
     IsNewDayNotNear, TeacherStartFilter, IsSomethingToPay, IsPenalty, IsNotTeacherAdd, IsHasTeacherStudents, \
-    IsIncorrectTimeInputWithPenalty
+    IsIncorrectTimeInputWithPenalty, IsUntilTimeNotification, IsDailyScheduleMailingTime, IsDailyReportMailingTime
 from fsm.fsm_teacher import FSMRegistrationTeacherForm, FSMRegistrationLessonWeek, FSMAddStudentToStudy
 from keyboards.everyone_kb import create_start_kb
 from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb, create_authorization_kb, \
@@ -111,20 +111,52 @@ async def process_bank_sent(message: Message, state: FSMContext):
     await state.set_state(FSMRegistrationTeacherForm.fill_penalty)
 
 
-# Ввели пенальти, сохраняем данные и чистим состояние
+# Ввели пенальти, просим ввести время, за которое будет приходить уведомление о занятии (ЧАСЫ:МИНУТЫ)
 @router.message(StateFilter(FSMRegistrationTeacherForm.fill_penalty), IsPenaltyCorrectInput())
-async def process_bank_sent(message: Message, state: FSMContext, session: AsyncSession):
+async def process_penalty_sent(message: Message, state: FSMContext):
     await state.update_data(penalty=message.text)
+    await message.answer(LEXICON_TEACHER['fill_until_time_notification'])
+    await state.set_state(FSMRegistrationTeacherForm.fill_until_time_notification)
 
+# Ввели время уведомления до занятия, просим ввести время для отправки расписания на день
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_until_time_notification), IsUntilTimeNotification())
+async def process_until_time_notification_sent(message: Message, state: FSMContext):
+    await state.update_data(until_time_notification=message.text)
+    await message.answer(LEXICON_TEACHER['fill_daily_schedule_mailing_time'])
+    await state.set_state(FSMRegistrationTeacherForm.fill_daily_schedule_mailing_time)
+
+# Ввели время для ежедневной рассылки сообщений, просим ввести время для формирования отчета зад день
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_daily_schedule_mailing_time),
+                IsDailyScheduleMailingTime())
+async def process_daily_schedule_mailing_time_sent(message: Message, state: FSMContext):
+    await state.update_data(daily_schedule_mailing_time=message.text)
+    await message.answer(LEXICON_TEACHER['fill_daily_report_mailing_time'])
+    await state.set_state(FSMRegistrationTeacherForm.fill_daily_report_mailing_time)
+
+# Ввели время для формирования отчета за день, просим ввести кол-во дней вперед,
+# когда будет приходить уведомление об отмене занятия
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_daily_report_mailing_time),
+                IsDailyReportMailingTime())
+async def process_days_cancellation_notification(message: Message, state: FSMContext):
+    await state.update_data(daily_report_mailing_time=message.text)
+    await message.answer(LEXICON_TEACHER['fill_days_cancellation_notification'])
+    await state.set_state(FSMRegistrationTeacherForm.fill_days_cancellation_notification)
+
+
+# Ввели кол-во дней вперед, когда будет приходить уведомление об отмене занятия
+# Сохраняем данные и чистим состояние
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_days_cancellation_notification),
+                F.text.isdigit())
+async def process_days_cancellation_notification_sent(message: Message, state: FSMContext,
+                                                      session: AsyncSession):
+    await state.update_data(days_cancellation_notification=int(message.text))
     teacher_form = await state.get_data()
-    await command_add_teacher(session,
-                              message.from_user.id,
-                              **teacher_form)
     await state.clear()
-
+    await command_add_teacher(session,
+                            message.from_user.id,
+                            **teacher_form)
     await message.answer(text=LEXICON_TEACHER['access_registration_profile'],
                          reply_markup=create_back_to_entrance_kb())
-
 
 # Случай, когда неправильно ввели имя
 @router.message(StateFilter(FSMRegistrationTeacherForm.fill_name))
@@ -146,21 +178,33 @@ async def process_wrong_phone_sent(message: Message):
 
 # Случай, когда неправильно ввели банк/банки
 @router.message(StateFilter(FSMRegistrationTeacherForm.fill_bank))
-async def process_wrong_phone_sent(message: Message):
+async def process_wrong_bank_sent(message: Message):
     await message.answer(text=LEXICON_TEACHER['not_fill_bank'])
-
-
-# Случай, когда неправильно ввели банк/банки
-@router.message(StateFilter(FSMRegistrationTeacherForm.fill_bank))
-async def process_wrong_phone_sent(message: Message):
-    await message.answer(text=LEXICON_TEACHER['not_fill_bank'])
-
 
 # Случай, когда неправильно ввели пенальти
 @router.message(StateFilter(FSMRegistrationTeacherForm.fill_penalty))
-async def process_wrong_phone_sent(message: Message):
+async def process_wrong_penalty_sent(message: Message):
     await message.answer(text=LEXICON_TEACHER['not_fill_penalty'])
 
+# Случай, когда неправильно ввели время уведомления до занятия
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_until_time_notification))
+async def process_wrong_until_time_notification_sent(message: Message):
+    await message.answer(text=LEXICON_TEACHER['not_fill_until_time_notification'])
+
+# Случай, когда неправильно ввели время для ежедневной отправки расписания
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_daily_schedule_mailing_time))
+async def process_wrong_daily_schedule_mailing_time_sent(message: Message):
+    await message.answer(text=LEXICON_TEACHER['not_fill_daily_schedule_mailing_time'])
+
+# Случай, когда неправильно ввели время для отчета за день
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_daily_report_mailing_time))
+async def process_wrong_daily_report_mailing_time_sent(message: Message):
+    await message.answer(text=LEXICON_TEACHER['not_fill_daily_report_mailing_time'])
+
+# Случай, когда неправильно кол-во дней вперед, когда будет приходить уведомление об отмене занятия
+@router.message(StateFilter(FSMRegistrationTeacherForm.fill_days_cancellation_notification))
+async def process_wrong_days_cancellation_notification_sent(message: Message):
+    await message.answer(text=LEXICON_TEACHER['not_fill_days_cancellation_notification'])
 
 # Случай, когда учитель уже зарегистрирован, но нажал на кнопку регистрации!
 @router.callback_query(F.data == 'reg_teacher', IsTeacherInDatabase())
@@ -769,4 +813,9 @@ async def process_confirmation_day_teacher(callback: CallbackQuery, bot: Bot):
 # Нажимаем __ОК__, когда пришло уведомление за какое-то время до занятия
 @router.callback_query(F.data == 'notice_lesson_certain_time_teacher')
 async def create_notice_lesson_certain_time_student(callback: CallbackQuery, bot: Bot):
+    await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
+
+# Нажимаем __ОК__, когда пришло уведомление об отмене занятия
+@router.callback_query(F.data == 'ok_remove_day_schedule_student')
+async def create_ok_remove_day_schedule_student(callback: CallbackQuery, bot: Bot):
     await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)

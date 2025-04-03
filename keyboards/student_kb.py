@@ -5,7 +5,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 
 from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
-    StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory, InformationLessonCallbackFactory
+    StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory, InformationLessonCallbackFactory, \
+    RemoveDayOfScheduleCallbackFactory
 from callback_factory.teacher_factories import SentMessagePaymentStudentCallbackFactory
 from lexicon.lexicon_student import LEXICON_STUDENT
 from lexicon.lexicon_teacher import LEXICON_TEACHER
@@ -248,6 +249,14 @@ def create_button_for_back_to_all_lessons_day(week_date_str,
                                   ).pack()
                                   )
              ],
+            [InlineKeyboardButton(text=LEXICON_STUDENT['cancel'],
+                                  callback_data=RemoveDayOfScheduleCallbackFactory(
+                                      week_date=week_date_str,
+                                      lesson_on=lesson_on,
+                                      lesson_off=lesson_off
+                                  ).pack()
+                                  )
+             ],
             [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
                                   callback_data=ShowDaysOfScheduleCallbackFactory(
                                       week_date=week_date_str
@@ -259,6 +268,14 @@ def create_button_for_back_to_all_lessons_day(week_date_str,
 
     return button_for_back_to_all_lessons_day
 
+def create_ok_remove_day_schedule_student_kb():
+    ok_remove_day_schedule_student_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_STUDENT['ok'],
+                                  callback_data='ok_remove_day_schedule_student')]
+        ]
+    )
+    return ok_remove_day_schedule_student_kb
 
 def create_settings_profile_kb():
     settings_profile_kb = InlineKeyboardMarkup(
