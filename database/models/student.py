@@ -5,7 +5,7 @@ from sqlalchemy.orm import mapped_column, Mapped, relationship
 
 from database.base import Base
 # from database import Teacher, LessonDay
-from . import teacher, lesson_day, penalties, access_student
+from . import teacher, lesson_day, penalties, access_student, debtor
 
 
 class Student(Base):
@@ -47,3 +47,5 @@ class Student(Base):
                                                                 cascade='delete')
 
     access: Mapped["access_student.AccessStudent"] = relationship(back_populates='student')
+
+    debtors: Mapped[list["debtor.Debtor"]] = relationship(back_populates='student')

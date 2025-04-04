@@ -1,5 +1,6 @@
 import asyncio
 import platform
+from datetime import date, time
 
 import taskiq
 from aiogram import Bot, Dispatcher
@@ -11,7 +12,7 @@ from taskiq import TaskiqDepends, TaskiqState, TaskiqEvents, Context, ScheduledT
 
 from broker import worker, scheduler_storage
 from config_data.config_data import load_config
-from database import AccessStudent
+from database import AccessStudent, Debtor
 
 from aiogram.fsm.storage.redis import RedisStorage
 
@@ -59,13 +60,22 @@ async def main():
     #      await connection.run_sync(Base.metadata.create_all)
     #      print("Создал")
 
+
     # Создаем хранилище redis для FSM
     storage = RedisStorage.from_url(config.tgbot.redis)
     # Устанавливаем вываливающуюся клавиатуру
     await set_new_menu(bot)
 
     session_maker = async_sessionmaker(engine)
-
+    async with session_maker() as session:
+        debtor = Debtor(teacher_id=7880267101,
+                        student_id=859717714,
+                        week_date=date(2025, 4, 2),
+                        lesson_on=time(11,30),
+                        lesson_off=time(12, 30),
+                        amount_money=1000)
+        session.add(debtor)
+        await session.commit()
     dp.include_router(everyone_handlers.router)
     dp.include_router(student_handlers.router)
     dp.include_router(teacher_handlers.router)
@@ -76,11 +86,12 @@ async def main():
     #     "session_pool": session_maker,
     # })
 
-    await worker.startup()
+    # await worker.startup()
+    #
+    # await scheduler_storage.startup()
+    # await teacher_mailing_lessons.kiq()
+    # await student_mailing_lessons.kiq()
 
-    await scheduler_storage.startup()
-    await teacher_mailing_lessons.kiq()
-    await student_mailing_lessons.kiq()
     # await scheduled_payment_verification.kiq()
     # Логика настройки проверки оплаты в 23:50 по мск
     # await scheduler_storage.add_schedule(

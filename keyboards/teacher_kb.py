@@ -7,7 +7,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from callback_factory.student_factories import ChangeStatusOfAddListCallbackFactory, DeleteStudentToStudyCallbackFactory
 from callback_factory.teacher_factories import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
-    DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory, PlugScheduleLessonWeekDayBackFactory
+    DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory, PlugScheduleLessonWeekDayBackFactory, \
+    DebtorInformationCallbackFactory
 from database.teacher_requests import give_student_by_student_id
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from services.services import NUMERIC_DATE
@@ -419,3 +420,49 @@ def create_notification_confirmation_student_kb():
         ]
     )
     return notification_confirmation_student_kb
+
+def create_list_debtors_kb(list_debtors):
+    list_debtors_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=LEXICON_TEACHER['line_debtor_information']
+                                     .format(debtor.week_date.strftime("%m.%d"),
+                                             debtor.student.name,
+                                             debtor.student.surname,
+                                             ),
+                                     callback_data=DebtorInformationCallbackFactory(
+                                         lesson_on=debtor.lesson_on.strftime("%H:%M"),
+                                         lesson_off=debtor.lesson_off.strftime("%H:%M"),
+                                         week_date=debtor.week_date.strftime("%d.%m"),
+                                         amount_money=debtor.amount_money
+                                     ).pack()
+                                     )
+            ]   for debtor in list_debtors
+        ] +
+        [
+            [InlineKeyboardButton(text=LEXICON_TEACHER['confirmation'],
+                                  callback_data='confirmation_debtors')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
+                                  callback_data='management_students')]
+        ]
+    )
+    return list_debtors_kb
+
+def change_list_debtors_kb(list_debtors):
+    list_debtors = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [
+                InlineKeyboardButton(text=LEXICON_TEACHER['line_debtor_information']
+                                     .format(debtor.week_date.strftime("%m.%d"),
+                                             debtor.student.name,
+                                             debtor.student.surname,
+                                             ),
+                                     callback_data='remove_one_debtor'
+                                     )
+            ]   for debtor in list_debtors
+        ] + [
+            [InlineKeyboardButton(text=LEXICON_TEACHER['exit'],
+                                  callback_data='management_students')]
+        ]
+    )
+    return list_debtors

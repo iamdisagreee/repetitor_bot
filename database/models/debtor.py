@@ -2,9 +2,10 @@ from datetime import time, date
 from uuid import UUID
 
 from sqlalchemy import Uuid, BigInteger, ForeignKey, Time, text, Date, func, Integer
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from database.base import Base
+from . import student
 
 
 class Debtor(Base):
@@ -17,3 +18,6 @@ class Debtor(Base):
     lesson_on: Mapped[time] = mapped_column(Time)
     lesson_off: Mapped[time] = mapped_column(Time)
     amount_money: Mapped[int] = mapped_column(Integer)
+
+    student: Mapped["student.Student"] = relationship(back_populates='debtors',
+                                                      cascade='delete')

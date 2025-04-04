@@ -35,7 +35,7 @@ async def command_add_students(session: AsyncSession,
                                class_learning=None,
                                course_learning=None,
                                ):
-    until_minute_notification, until_hour_notification = [int(el) for el in until_time_notification.split(':33')]
+    until_minute_notification, until_hour_notification = [int(el) for el in until_time_notification.split(':')]
     student = Student(student_id=student_id,
                       name=name,
                       surname=surname,
@@ -222,7 +222,6 @@ async def delete_student_profile(session: AsyncSession,
     profile = await session.execute(select(Student)
                                     .where(Student.student_id == student_id))
     await session.delete(profile.scalar())
-    await session.commit()
 
 
 async def give_students_penalty(session: AsyncSession,
@@ -233,3 +232,23 @@ async def give_students_penalty(session: AsyncSession,
     )
 
     return student_penalties.scalars().all()
+
+# Удаляем все интервалы из переданного списка
+async def delete_gap_lessons_by_student(session: AsyncSession,
+                                        student_id: int,
+                                        week_date: date,
+                                        lesson_on: time,
+                                        lesson_off: time):
+    stmt = (
+        delete(LessonDay)
+        .where(
+                and_(
+                    LessonDay.student_id == student_id,
+                    LessonDay.week_date == week_date,
+                    LessonDay.lesson_start >= lesson_on,
+                    LessonDay.lesson_finished <= lesson_off
+                )
+        )
+    )
+
+    await session.execute(stmt)

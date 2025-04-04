@@ -1,5 +1,5 @@
 import time
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 
 from aiogram import Router, F, Bot
 from aiogram.filters import StateFilter
@@ -20,7 +20,8 @@ from database import Student, LessonDay
 from database.student_requests import command_get_all_teachers, command_add_students, give_lessons_week_for_day, \
     add_lesson_day, give_teacher_by_student_id, give_all_busy_time_intervals, \
     give_all_lessons_for_day, remove_lesson_day, give_week_id_by_teacher_id, \
-    give_information_of_lesson, delete_student_profile, give_students_penalty, give_all_information_teacher
+    give_information_of_lesson, delete_student_profile, give_students_penalty, give_all_information_teacher, \
+    delete_gap_lessons_by_student
 from filters.student_filters import IsStudentInDatabase, IsInputFieldAlpha, \
     FindNextSevenDaysFromKeyboard, IsMoveRightAddMenu, IsMoveLeftMenu, IsTeacherDidSlots, IsStudentChooseSlots, \
     IsMoveRightRemoveMenu, IsLessonsInChoseDay, IsTimeNotExpired, IsFreeSlots, IsTeacherDidSystemPenalties, \
@@ -38,7 +39,8 @@ from lexicon.lexicon_all import LEXICON_ALL
 from lexicon.lexicon_student import LEXICON_STUDENT
 from services.services import give_list_with_days, create_choose_time_student, give_date_format_fsm, \
     give_time_format_fsm, create_delete_time_student, show_all_lessons_for_day, \
-    give_text_information_lesson, course_class_choose, COUNT_BAN, give_result_status_timeinterval, NUMERIC_DATE
+    give_text_information_lesson, course_class_choose, COUNT_BAN, give_result_status_timeinterval, NUMERIC_DATE, \
+    create_list_gaps_by_time_on_and_off, is_correct_sent_delete_lesson_for_teacher
 from tasks import notice_lesson_certain_time_student
 
 # Преподаватель - нет доступа
@@ -545,10 +547,11 @@ async def process_show_schedule(callback: CallbackQuery, state: FSMContext):
 
 # Выбираем день занятия (нажимаем на этот день)
 @router.callback_query(ShowDaysOfScheduleCallbackFactory.filter(), IsLessonsInChoseDay())
-async def process_show_lessons_for_day(callback: CallbackQuery, session: AsyncSession,
+async def process_show_lessons_for_day(callback: CallbackQuery,
                                        callback_data: ShowDaysOfScheduleCallbackFactory,
                                        state: FSMContext,
                                        all_lessons_for_day_not_ordered: list[LessonDay]):
+
     await state.update_data(week_date=callback_data.week_date)
 
     all_lessons_for_day_ordered_list = show_all_lessons_for_day(all_lessons_for_day_not_ordered)
@@ -663,20 +666,50 @@ async def process_sent_student_payment_confirmation(callback: CallbackQuery, tea
 @router.callback_query(RemoveDayOfScheduleCallbackFactory.filter())
 async def process_remove_lesson_student(callback: CallbackQuery, bot: Bot, session: AsyncSession,
                                         callback_data: RemoveDayOfScheduleCallbackFactory):
+
     student = await give_teacher_by_student_id(session, callback.from_user.id)
     lesson_on_time = give_time_format_fsm(callback_data.lesson_on)
     lesson_off_time = give_time_format_fsm(callback_data.lesson_off)
     week_date_date = give_date_format_fsm(callback_data.week_date)
-    await bot.send_message(chat_id=student.teacher_id, text=LEXICON_STUDENT['student_cancellation_lesson']
-                           .format(student.name, student.surname, week_date_date.strftime("%m.%d"),
-                                   NUMERIC_DATE[date(year=week_date_date.year,
-                                                     month=week_date_date.month,
-                                                     day=week_date_date.day).isoweekday()],
-                                   lesson_on_time.strftime("%H:%M"),
-                                   lesson_off_time.strftime("%H:%M")),
-                           reply_markup=create_ok_remove_day_schedule_student_kb()
-                           )
 
+    ######### Удаляем интервалы из таблицы lessons_day
+    await delete_gap_lessons_by_student(session, callback.from_user.id,
+                                        week_date_date, lesson_on_time,
+                                        lesson_off_time)
+    ######### Отображаем обновленную страничку
+    all_lessons_for_day_not_ordered = ( await give_all_lessons_for_day(session,
+                                       week_date_date,
+                                       callback.from_user.id
+                                       )
+                                      ).all()
+
+    #### Если это была не единственная запись на день, то на обновленную страницу со списком занятий на день
+    if all_lessons_for_day_not_ordered:
+        all_lessons_for_day_ordered_list = show_all_lessons_for_day(all_lessons_for_day_not_ordered)
+
+        await callback.message.edit_text(text=LEXICON_STUDENT['schedule_lesson_day'],
+                                         reply_markup=all_lessons_for_day_kb(all_lessons_for_day_ordered_list)
+                                         )
+    #### Если это была единственная запись - то пробрасываем в меню выбора дней
+    else:
+        next_seven_days_with_cur = give_list_with_days(datetime.now())
+
+        await callback.message.edit_text(text=LEXICON_STUDENT['my_schedule_menu'],
+                                         reply_markup=show_next_seven_days_schedule_kb(*next_seven_days_with_cur))
+
+    ########## Отправляем информацию об удалении учителю в случае, если время удаления занятия находится в диапазоне дней,
+    ########## когда учитель хочет получать информацию
+    if is_correct_sent_delete_lesson_for_teacher(student.teacher.days_cancellation_notification, week_date_date):
+        await bot.send_message(chat_id=student.teacher_id, text=LEXICON_STUDENT['student_cancellation_lesson']
+                               .format(student.name, student.surname, week_date_date.strftime("%m.%d"),
+                                       NUMERIC_DATE[date(year=week_date_date.year,
+                                                         month=week_date_date.month,
+                                                         day=week_date_date.day).isoweekday()],
+                                       lesson_on_time.strftime("%H:%M"),
+                                       lesson_off_time.strftime("%H:%M")),
+                               reply_markup=create_ok_remove_day_schedule_student_kb()
+                               )
+    await session.commit()
 
 
 ###################################### Кнопка НАСТРОЙКИ #############################################

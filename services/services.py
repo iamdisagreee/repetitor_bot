@@ -342,3 +342,28 @@ def course_class_choose(class_learning,
                         course_learning):
     return f'{class_learning} класс' if class_learning \
         else f'{course_learning} класс'
+
+#Получаем список всех интервалов из заданного интервала: [lesson_on; lesson_off]
+def create_list_gaps_by_time_on_and_off(week_date: date,
+                                        lesson_on: time,
+                                        lesson_off: time):
+    lesson_on_dt = datetime(year=week_date.year, month=week_date.month,
+                            day=week_date.day, hour=lesson_on.hour,
+                            minute=lesson_on.minute)
+    lesson_off_dt=datetime(year=week_date.year, month=week_date.month,
+                           day=week_date.day, hour=lesson_off.hour,
+                           minute=lesson_off.minute)
+    list_gaps_time = []
+    while lesson_on_dt != lesson_off_dt:
+        list_gaps_time.append(time(hour=lesson_on_dt.hour,
+                                   minute=lesson_on_dt.minute))
+        lesson_on_dt += timedelta(minutes=30)
+
+    return list_gaps_time
+
+def is_correct_sent_delete_lesson_for_teacher(days_cancellation_notification: int,
+                                              week_date_date):
+
+    return days_cancellation_notification and datetime.now() \
+         + timedelta(days=days_cancellation_notification - 1) >= \
+        datetime(year=week_date_date.year, month=week_date_date.month, day=week_date_date.day)

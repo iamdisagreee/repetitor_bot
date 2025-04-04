@@ -9,10 +9,10 @@ from sqlalchemy import select, and_, delete
 from sqlalchemy.orm import selectinload
 
 from callback_factory.teacher_factories import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory
-from database import Teacher, LessonWeek, LessonDay, Student, AccessTeacher
+from database import Teacher, LessonWeek, LessonDay, Student, AccessTeacher, Debtor
 from database.models import Penalty
 from database.teacher_requests import give_installed_lessons_week, give_penalty_by_teacher_id, \
-    give_student_by_teacher_id, give_all_lessons_day_by_week_day
+    give_student_by_teacher_id, give_all_lessons_day_by_week_day, give_list_debtors
 from services.services import give_list_with_days, give_date_format_callback, give_date_format_fsm, give_time_format_fsm
 
 
@@ -69,6 +69,10 @@ class IsDailyReportMailingTime(BaseFilter):
     async def __call__(self, message: Message):
         return re.fullmatch(r'^0[0-9]:[0-5][0-9]|^1[0-9]:[0-5][0-9]|'
                             r'^2[0-3]:[0-5][0-9]', message.text)
+
+class IsDaysCancellationNotification(BaseFilter):
+    async def __call__(self, message: Message):
+        return message.text.isdigit() and int(message.text) >= 0
 
 # Фильтр, который отлавливает апдейты, когда мы нажимаем на один из дней расписания
 class FindNextSevenDaysFromKeyboard(BaseFilter):
@@ -328,3 +332,10 @@ class IsHasTeacherStudents(BaseFilter):
         if has_students:
             return {'list_students': has_students}
         return False
+
+class IsDebtorsInDatabase(BaseFilter):
+    async def __call__(self, callback: CallbackQuery, session: AsyncSession):
+        list_debtors = await give_list_debtors(session, callback.from_user.id)
+        if list_debtors:
+            return {'list_debtors': list_debtors}
+

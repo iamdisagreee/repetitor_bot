@@ -15,7 +15,7 @@ from callback_factory.student_factories import ChangeStatusOfAddListCallbackFact
 from callback_factory.teacher_factories import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
     DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory, PlugScheduleLessonWeekDayBackFactory, \
-    SentMessagePaymentStudentCallbackFactory
+    SentMessagePaymentStudentCallbackFactory, DebtorInformationCallbackFactory
 from database import Student, LessonDay, LessonWeek, AccessStudent
 from database.models import Penalty
 # from database.taskiq_requests import give_scheduled_payment_verification_teachers
@@ -26,14 +26,15 @@ from database.teacher_requests import command_add_teacher, command_add_lesson_we
     delete_student_id_in_database, give_all_students_by_teacher_penalties, delete_all_lessons_student, \
     give_status_entry_student, give_student_by_teacher_id, \
     give_teacher_profile_by_teacher_id, delete_all_penalties_student, add_penalty_to_student, delete_penalty_of_student, \
-    give_status_pay_student
+    give_status_pay_student, give_student_by_student_id
 from filters.teacher_filters import IsTeacherInDatabase, \
     FindNextSevenDaysFromKeyboard, IsCorrectFormatTime, IsEndBiggerStart, IsDifferenceLessThirtyMinutes, \
     IsConflictWithStart, IsConflictWithEnd, IsLessonWeekInDatabase, \
     IsSomethingToShowSchedule, \
     IsPhoneCorrectInput, IsBankCorrectInput, IsPenaltyCorrectInput, IsInputTimeLongerThanNow, \
     IsNewDayNotNear, TeacherStartFilter, IsSomethingToPay, IsPenalty, IsNotTeacherAdd, IsHasTeacherStudents, \
-    IsIncorrectTimeInputWithPenalty, IsUntilTimeNotification, IsDailyScheduleMailingTime, IsDailyReportMailingTime
+    IsIncorrectTimeInputWithPenalty, IsUntilTimeNotification, IsDailyScheduleMailingTime, IsDailyReportMailingTime, \
+    IsDaysCancellationNotification, IsDebtorsInDatabase
 from fsm.fsm_teacher import FSMRegistrationTeacherForm, FSMRegistrationLessonWeek, FSMAddStudentToStudy
 from keyboards.everyone_kb import create_start_kb
 from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb, create_authorization_kb, \
@@ -42,7 +43,7 @@ from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb,
     show_schedule_lesson_day_kb, back_to_show_schedule_teacher, back_to_show_or_delete_schedule_teacher, \
     settings_teacher_kb, create_management_students_kb, create_list_add_students_kb, \
     create_back_to_management_students_kb, create_list_delete_students_kb, show_list_of_debtors_kb, back_to_settings_kb, \
-    create_notification_confirmation_student_kb
+    create_notification_confirmation_student_kb, create_list_debtors_kb
 from lexicon.lexicon_all import LEXICON_ALL
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from main import worker
@@ -146,7 +147,7 @@ async def process_days_cancellation_notification(message: Message, state: FSMCon
 # Ввели кол-во дней вперед, когда будет приходить уведомление об отмене занятия
 # Сохраняем данные и чистим состояние
 @router.message(StateFilter(FSMRegistrationTeacherForm.fill_days_cancellation_notification),
-                F.text.isdigit())
+                IsDaysCancellationNotification())
 async def process_days_cancellation_notification_sent(message: Message, state: FSMContext,
                                                       session: AsyncSession):
     await state.update_data(days_cancellation_notification=int(message.text))
@@ -782,26 +783,49 @@ async def process_teacher_sent(message: Message):
 
 
 ################################ Кнопка __Список должников__ #################################################
-@router.callback_query(F.data == 'list_debtors', IsPenalty())
-async def process_show_list_debtors(callback: CallbackQuery, session: AsyncSession):
-    list_students = await give_all_students_by_teacher_penalties(session,
-                                                                 callback.from_user.id)
+# @router.callback_query(F.data == 'list_debtors', IsPenalty())
+# async def process_show_list_debtors(callback: CallbackQuery, session: AsyncSession):
+#     list_students = await give_all_students_by_teacher_penalties(session,
+#                                                                  callback.from_user.id)
+#
+#     await callback.message.edit_text(text='Здесь вы увидите должников и их данные',
+#                                      reply_markup=show_list_of_debtors_kb(list_students))
+#
+#
+# # У ученика нет пенальти!
+# @router.callback_query(F.data == 'list_debtors', ~IsPenalty())
+# async def process_show_list_debtors(callback: CallbackQuery):
+#     await callback.answer(text=LEXICON_TEACHER['system_off'])
+#
+#
+# # Кнопка с данными о пенальти
+# @router.callback_query(PlugPenaltyTeacherCallbackFactory.filter())
+# async def process_show_list_debtors_plug(callback):
+#     await callback.answer()
 
-    await callback.message.edit_text(text='Здесь вы увидите должников и их статистику',
-                                     reply_markup=show_list_of_debtors_kb(list_students))
+@router.callback_query(F.data == 'list_debtors', IsDebtorsInDatabase())
+async def process_show_list_debtors(callback: CallbackQuery,
+                                    list_debtors):
+    await callback.message.edit_text(text=LEXICON_TEACHER['debtors_start_page'],
+                                     reply_markup=create_list_debtors_kb(list_debtors))
 
+@router.callback_query(DebtorInformationCallbackFactory.filter())
+async def process_show_full_debtor_information(callback: CallbackQuery, session: AsyncSession,
+                                               callback_data: DebtorInformationCallbackFactory):
+    student = await give_student_by_student_id(session, callback.from_user.id)
+    await callback.answer(text=LEXICON_TEACHER['full_information_debtor']
+                          .format(student.student_name,
+                                  student.student_surname,
+                                  callback_data.week_date,
+                                  callback_data.lesson_on,
+                                  callback_data.lesson_off,
+                                  callback_data.amount_money),
+                          show_alert=True)
 
-# У ученика нет пенальти!
-@router.callback_query(F.data == 'list_debtors', ~IsPenalty())
+#Должиков нет
+@router.callback_query(F.data == 'list_debtors')
 async def process_show_list_debtors(callback: CallbackQuery):
-    await callback.answer(text=LEXICON_TEACHER['system_off'])
-
-
-# Кнопка с данными о пенальти
-@router.callback_query(PlugPenaltyTeacherCallbackFactory.filter())
-async def process_show_list_debtors_plug(callback):
-    await callback.answer()
-
+    await callback.answer(text=LEXICON_TEACHER['not_show_list_debtors'])
 
 ############################## НАЖИМАЕМ __ОК__ В ЕЖЕДНЕВНОЙ РАССЫЛКЕ ###################################
 @router.callback_query(F.data == 'confirmation_day_teacher')
