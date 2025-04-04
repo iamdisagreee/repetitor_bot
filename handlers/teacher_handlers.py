@@ -1,4 +1,5 @@
 import asyncio
+import uuid
 from datetime import datetime, timedelta, date, time, timezone
 
 from aiogram import Router, F, Bot
@@ -15,7 +16,7 @@ from callback_factory.student_factories import ChangeStatusOfAddListCallbackFact
 from callback_factory.teacher_factories import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
     DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory, PlugScheduleLessonWeekDayBackFactory, \
-    SentMessagePaymentStudentCallbackFactory, DebtorInformationCallbackFactory
+    SentMessagePaymentStudentCallbackFactory, DebtorInformationCallbackFactory, RemoveDebtorFromListCallbackFactory
 from database import Student, LessonDay, LessonWeek, AccessStudent
 from database.models import Penalty
 # from database.taskiq_requests import give_scheduled_payment_verification_teachers
@@ -26,7 +27,8 @@ from database.teacher_requests import command_add_teacher, command_add_lesson_we
     delete_student_id_in_database, give_all_students_by_teacher_penalties, delete_all_lessons_student, \
     give_status_entry_student, give_student_by_teacher_id, \
     give_teacher_profile_by_teacher_id, delete_all_penalties_student, add_penalty_to_student, delete_penalty_of_student, \
-    give_status_pay_student, give_student_by_student_id
+    give_status_pay_student, give_student_by_student_id, give_list_debtors, remove_debtor_from_list, \
+    give_student_by_teacher_id_debtors
 from filters.teacher_filters import IsTeacherInDatabase, \
     FindNextSevenDaysFromKeyboard, IsCorrectFormatTime, IsEndBiggerStart, IsDifferenceLessThirtyMinutes, \
     IsConflictWithStart, IsConflictWithEnd, IsLessonWeekInDatabase, \
@@ -43,7 +45,7 @@ from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb,
     show_schedule_lesson_day_kb, back_to_show_schedule_teacher, back_to_show_or_delete_schedule_teacher, \
     settings_teacher_kb, create_management_students_kb, create_list_add_students_kb, \
     create_back_to_management_students_kb, create_list_delete_students_kb, show_list_of_debtors_kb, back_to_settings_kb, \
-    create_notification_confirmation_student_kb, create_list_debtors_kb
+    create_notification_confirmation_student_kb, create_list_debtors_kb, change_list_debtors_kb
 from lexicon.lexicon_all import LEXICON_ALL
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from main import worker
@@ -803,22 +805,31 @@ async def process_teacher_sent(message: Message):
 # async def process_show_list_debtors_plug(callback):
 #     await callback.answer()
 
+# Список всех должников
 @router.callback_query(F.data == 'list_debtors', IsDebtorsInDatabase())
 async def process_show_list_debtors(callback: CallbackQuery,
                                     list_debtors):
     await callback.message.edit_text(text=LEXICON_TEACHER['debtors_start_page'],
                                      reply_markup=create_list_debtors_kb(list_debtors))
 
+# Подробная информация о должнике
 @router.callback_query(DebtorInformationCallbackFactory.filter())
 async def process_show_full_debtor_information(callback: CallbackQuery, session: AsyncSession,
                                                callback_data: DebtorInformationCallbackFactory):
-    student = await give_student_by_student_id(session, callback.from_user.id)
+    week_date=give_date_format_fsm(callback_data.week_date)
+    lesson_on=give_time_format_fsm(callback_data.lesson_on)
+    lesson_off=give_time_format_fsm(callback_data.lesson_off)
+
+    student = await give_student_by_teacher_id_debtors(session,
+                                                       callback.from_user.id,
+                                                       week_date, lesson_on)
+    # print(student)
     await callback.answer(text=LEXICON_TEACHER['full_information_debtor']
-                          .format(student.student_name,
-                                  student.student_surname,
-                                  callback_data.week_date,
-                                  callback_data.lesson_on,
-                                  callback_data.lesson_off,
+                          .format(student.student_name, #Vova
+                                  student.student_surname, #Kharitonov
+                                  week_date.strftime("%d.%m"),
+                                  lesson_on.strftime("%H:%M"),
+                                  lesson_off.strftime("%H:%M"),
                                   callback_data.amount_money),
                           show_alert=True)
 
@@ -826,6 +837,25 @@ async def process_show_full_debtor_information(callback: CallbackQuery, session:
 @router.callback_query(F.data == 'list_debtors')
 async def process_show_list_debtors(callback: CallbackQuery):
     await callback.answer(text=LEXICON_TEACHER['not_show_list_debtors'])
+
+
+#Нажали на кнопку __РЕДАКТИРОВАНИЕ__
+@router.callback_query(F.data == 'confirmation_debtors')
+async def process_change_list_debtors(callback: CallbackQuery, session: AsyncSession):
+    list_debtors = await give_list_debtors(session, callback.from_user.id)
+    await callback.message.edit_text(text=LEXICON_TEACHER['change_list_debtors'],
+                                     reply_markup=change_list_debtors_kb(list_debtors))
+
+# Ловим на удаление из списка должников
+@router.callback_query(RemoveDebtorFromListCallbackFactory.filter())
+async def process_remove_debtor(callback: CallbackQuery, session: AsyncSession,
+                                callback_data: RemoveDebtorFromListCallbackFactory):
+    # Удаляем должника
+    await remove_debtor_from_list(session, uuid.UUID(callback_data.debtor_id))
+    # Отображаем обновленный список должников
+    list_debtors = await give_list_debtors(session, callback.from_user.id)
+    await callback.message.edit_text(text=LEXICON_TEACHER['change_list_debtors'],
+                                     reply_markup=change_list_debtors_kb(list_debtors))
 
 ############################## НАЖИМАЕМ __ОК__ В ЕЖЕДНЕВНОЙ РАССЫЛКЕ ###################################
 @router.callback_query(F.data == 'confirmation_day_teacher')

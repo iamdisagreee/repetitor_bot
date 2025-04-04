@@ -8,7 +8,7 @@ from callback_factory.student_factories import ChangeStatusOfAddListCallbackFact
 from callback_factory.teacher_factories import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
     DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory, PlugScheduleLessonWeekDayBackFactory, \
-    DebtorInformationCallbackFactory
+    DebtorInformationCallbackFactory, RemoveDebtorFromListCallbackFactory
 from database.teacher_requests import give_student_by_student_id
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from services.services import NUMERIC_DATE
@@ -433,7 +433,7 @@ def create_list_debtors_kb(list_debtors):
                                      callback_data=DebtorInformationCallbackFactory(
                                          lesson_on=debtor.lesson_on.strftime("%H:%M"),
                                          lesson_off=debtor.lesson_off.strftime("%H:%M"),
-                                         week_date=debtor.week_date.strftime("%d.%m"),
+                                         week_date=str(debtor.week_date),
                                          amount_money=debtor.amount_money
                                      ).pack()
                                      )
@@ -457,7 +457,9 @@ def change_list_debtors_kb(list_debtors):
                                              debtor.student.name,
                                              debtor.student.surname,
                                              ),
-                                     callback_data='remove_one_debtor'
+                                     callback_data=RemoveDebtorFromListCallbackFactory(
+                                         debtor_id=str(debtor.debtor_id)
+                                     ).pack()
                                      )
             ]   for debtor in list_debtors
         ] + [

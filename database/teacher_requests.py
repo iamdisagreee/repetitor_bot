@@ -1,3 +1,4 @@
+import uuid
 from datetime import datetime, date, time
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -25,7 +26,7 @@ async def command_add_teacher(session: AsyncSession,
                               days_cancellation_notification: int,
                               ):
     until_hour_notification, until_minute_notification = \
-                                    [int(el) for el in until_time_notification.split(':')]
+        [int(el) for el in until_time_notification.split(':')]
     teacher = Teacher(teacher_id=teacher_id,
                       name=name,
                       surname=surname,
@@ -380,10 +381,26 @@ async def give_student_by_teacher_id(session: AsyncSession,
     return student.scalar()
 
 
+async def give_student_by_teacher_id_debtors(session: AsyncSession,
+                                             teacher_id: int,
+                                             week_date: date,
+                                             lesson_on: time):
+    student = await session.execute(
+        select(Student)
+        .join(LessonDay, Student.student_id == LessonDay.student_id)
+        .where(
+            and_(
+                LessonDay.week_date == week_date,
+                LessonDay.teacher_id == teacher_id,
+                LessonDay.lesson_start == lesson_on
+            )
+        )
+    )
+    return student.scalar()
+
 # Удаляем все занятия ученика
 async def delete_all_lessons_student(session: AsyncSession,
                                      student_id: int):
-
     to_delete_lesson_day = (delete(LessonDay)
                             .where(Student.student_id == student_id))
     await session.execute(to_delete_lesson_day)
@@ -420,6 +437,7 @@ async def delete_penalty_of_student(session: AsyncSession,
     await session.execute(stmt)
     await session.commit()
 
+
 async def give_list_debtors(session: AsyncSession,
                             teacher_id: int):
     stmt = (
@@ -430,3 +448,12 @@ async def give_list_debtors(session: AsyncSession,
     )
     list_debtors = await session.execute(stmt)
     return list_debtors.scalars().all()
+
+
+async def remove_debtor_from_list(session: AsyncSession,
+                                  debtor_id: UUID):
+    await session.execute(
+        delete(Debtor)
+        .where(Debtor.debtor_id == debtor_id)
+    )
+    await session.commit()

@@ -1,3 +1,4 @@
+import uuid
 from uuid import UUID
 
 from aiogram.filters.callback_data import CallbackData
@@ -56,3 +57,6 @@ class DebtorInformationCallbackFactory(CallbackData, prefix='debtor', sep=';'):
     lesson_off: str
     week_date: str
     amount_money: int
+
+class RemoveDebtorFromListCallbackFactory(CallbackData, prefix='delete', sep=','):
+    debtor_id: str
