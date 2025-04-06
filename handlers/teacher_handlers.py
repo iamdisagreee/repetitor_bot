@@ -51,7 +51,7 @@ from lexicon.lexicon_teacher import LEXICON_TEACHER
 from main import worker
 from services.services import give_list_with_days, give_time_format_fsm, give_date_format_fsm, \
     give_list_registrations_str, show_intermediate_information_lesson_day_status, give_result_info, COUNT_BAN, \
-    course_class_choose, NUMERIC_DATE
+    course_class_choose, NUMERIC_DATE, create_scheduled_task_handler
 from services.services_taskiq import give_available_ids
 from tasks import daily_newsletter_teacher, activities_day_teacher
 
@@ -123,7 +123,7 @@ async def process_penalty_sent(message: Message, state: FSMContext):
 
 # Ввели время уведомления до занятия, просим ввести время для отправки расписания на день
 @router.message(StateFilter(FSMRegistrationTeacherForm.fill_until_time_notification), IsUntilTimeNotification())
-async def process_until_time_notification_sent(message: Message, state: FSMContext):
+async def process_until_time_notification_sent(message: Message, state: FSMContext, scheduler_storage):
     await state.update_data(until_time_notification=message.text)
     await message.answer(LEXICON_TEACHER['fill_daily_schedule_mailing_time'])
     await state.set_state(FSMRegistrationTeacherForm.fill_daily_schedule_mailing_time)
@@ -136,6 +136,12 @@ async def process_daily_schedule_mailing_time_sent(message: Message, state: FSMC
     await message.answer(LEXICON_TEACHER['fill_daily_report_mailing_time'])
     await state.set_state(FSMRegistrationTeacherForm.fill_daily_report_mailing_time)
 
+    hour, minute = [int(el) for el in message.text.split(':')]
+    await create_scheduled_task_handler(task_name='daily_schedule_mailing_teacher',
+                                        kwargs={'teacher_id': message.from_user.id},
+                                        schedule_id=f'd_s_{message.from_user.id}',
+                                        cron=f'{minute} {hour} * * *')
+
 # Ввели время для формирования отчета за день, просим ввести кол-во дней вперед,
 # когда будет приходить уведомление об отмене занятия
 @router.message(StateFilter(FSMRegistrationTeacherForm.fill_daily_report_mailing_time),
@@ -145,6 +151,11 @@ async def process_days_cancellation_notification(message: Message, state: FSMCon
     await message.answer(LEXICON_TEACHER['fill_days_cancellation_notification'])
     await state.set_state(FSMRegistrationTeacherForm.fill_days_cancellation_notification)
 
+    hour, minute = [int(el) for el in message.text.split(":")]
+    await create_scheduled_task_handler(task_name='daily_report_mailing_teacher',
+                                        kwargs={'teacher_id': message.from_user.id},
+                                        schedule_id=f'd_r_{message.from_user.id}',
+                                        cron=f'{minute} {hour} * * *')
 
 # Ввели кол-во дней вперед, когда будет приходить уведомление об отмене занятия
 # Сохраняем данные и чистим состояние
@@ -225,11 +236,6 @@ async def process_not_start_authorization(callback: CallbackQuery):
 @router.callback_query(F.data == 'auth_teacher', IsTeacherInDatabase())
 async def process_start_authorization(callback: CallbackQuery, session: AsyncSession,
                                       scheduler_storage: NATSKeyValueScheduleSource):
-    # await give_scheduled_payment_verification_teachers(session)
-    # Логика настройки проверки оплаты в 23:50 по мск
-    # available_ids = await give_available_ids(
-    #     scheduler_storage)  # set(map(lambda x: x.schedule_id, await scheduler_storage.get_schedules()))
-    # if f's_p_v_{callback.from_user.id}' not in available_ids:
     await callback.message.edit_text(text=LEXICON_TEACHER['main_menu_authorization'],
                                      reply_markup=create_authorization_kb())
 
@@ -667,7 +673,13 @@ async def process_show_teacher_profile(callback: CallbackQuery, session: AsyncSe
                                      .format(teacher.surname,
                                              teacher.name,
                                              teacher.phone,
-                                             teacher.bank),
+                                             teacher.bank,
+                                             teacher.until_hour_notification,
+                                             teacher.until_minute_notification,
+                                             teacher.daily_schedule_mailing_time.strftime("%H:%M"),
+                                             teacher.daily_report_mailing_time.strftime("%H:%M"),
+                                             teacher.days_cancellation_notification,
+                                             ),
                                      reply_markup=back_to_settings_kb())
 
 

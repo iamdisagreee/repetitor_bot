@@ -338,4 +338,3 @@ class IsDebtorsInDatabase(BaseFilter):
         list_debtors = await give_list_debtors(session, callback.from_user.id)
         if list_debtors:
             return {'list_debtors': list_debtors}
-

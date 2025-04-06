@@ -21,12 +21,12 @@ from database.student_requests import command_get_all_teachers, command_add_stud
     add_lesson_day, give_teacher_by_student_id, give_all_busy_time_intervals, \
     give_all_lessons_for_day, remove_lesson_day, give_week_id_by_teacher_id, \
     give_information_of_lesson, delete_student_profile, give_students_penalty, give_all_information_teacher, \
-    delete_gap_lessons_by_student
+    delete_gap_lessons_by_student, give_all_debts_student
 from filters.student_filters import IsStudentInDatabase, IsInputFieldAlpha, \
     FindNextSevenDaysFromKeyboard, IsMoveRightAddMenu, IsMoveLeftMenu, IsTeacherDidSlots, IsStudentChooseSlots, \
     IsMoveRightRemoveMenu, IsLessonsInChoseDay, IsTimeNotExpired, IsFreeSlots, IsTeacherDidSystemPenalties, \
     IsStudentHasPenalties, StudentStartFilter, IsRightClassCourse, IsRightPrice, \
-    IsNotAlreadyConfirmed, IsUntilTimeNotification
+    IsNotAlreadyConfirmed, IsUntilTimeNotification, IsDebtsStudent
 from fsm.fsm_student import FSMRegistrationStudentForm
 from keyboards.everyone_kb import create_start_kb
 from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, create_level_choice_kb, \
@@ -34,7 +34,7 @@ from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, 
     create_choose_time_student_kb, create_delete_lessons_menu, show_next_seven_days_schedule_kb, all_lessons_for_day_kb, \
     create_button_for_back_to_all_lessons_day, create_settings_profile_kb, create_information_penalties, \
     create_back_to_settings_student_kb, create_confirm_payment_teacher_kb, \
-    create_ok_remove_day_schedule_student_kb
+    create_ok_remove_day_schedule_student_kb, create_debts_student_kb
 from lexicon.lexicon_all import LEXICON_ALL
 from lexicon.lexicon_student import LEXICON_STUDENT
 from services.services import give_list_with_days, create_choose_time_student, give_date_format_fsm, \
@@ -734,9 +734,10 @@ async def process_show_information_profile(callback: CallbackQuery, session: Asy
                                              student.place_study,
                                              course_class,
                                              student.subject,
-                                             student.price),
+                                             student.price,
+                                             student.until_hour_notification,
+                                             student.until_minute_notification),
                                      reply_markup=create_back_to_settings_student_kb())
-
 
 # Выбрали __Редактировать профиль__
 @router.callback_query(F.data == 'edit_profile', StateFilter(default_state))
@@ -745,6 +746,10 @@ async def process_change_settings_profile(callback: CallbackQuery, state: FSMCon
 
     await state.set_state(FSMRegistrationStudentForm.fill_name)
 
+#Нажали на кнопку - ничего не происходит
+@router.callback_query(F.data == 'debt_information')
+async def process_nothing_debt_information(callback: CallbackQuery):
+    await callback.answer()
 
 @router.callback_query(F.data == 'delete_profile')
 async def process_delete_profile(callback: CallbackQuery, session: AsyncSession):
@@ -763,8 +768,20 @@ async def process_penalties(callback: CallbackQuery, session: AsyncSession):
     await callback.message.edit_text(text=LEXICON_STUDENT['penalty_menu']
                                      .format(COUNT_BAN - len(student_penalties)),
                                      reply_markup=create_information_penalties(student_penalties))
+####################################### Кнопка Задолженности #########################################
+@router.callback_query(F.data == 'debts', IsDebtsStudent())
+async def process_debts(callback: CallbackQuery, session: AsyncSession,
+                        list_debts):
+    await callback.message.edit_text(text=LEXICON_STUDENT['debts_header'],
+                                     reply_markup=create_debts_student_kb(list_debts))
+
+# Нет задолженностей
+@router.callback_query(F.data == 'debts')
+async def not_process_debts(callback: CallbackQuery):
+    await callback.answer(text=LEXICON_STUDENT['no_debts'])
 
 
+#######################################################################################################
 # Нажатие на кнопки с информацией - ничего не должно происходить
 @router.callback_query(PlugPenaltyStudentCallbackFactory.filter())
 async def process_not_penalties(callback: CallbackQuery):

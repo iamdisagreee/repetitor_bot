@@ -28,7 +28,7 @@ from services.services_taskiq import give_data_config_teacher, give_everyday_sch
 
 
 # Ежедневная рассылка для преподавателя и его учеников-должников
-@worker.task(task_name='daily_newsletter_teacher')
+@worker.task(task_name='daily_report_mailing_teacher')
 async def daily_newsletter_teacher(teacher_id: int,
                                    context: Context = TaskiqDepends(),
                                    bot: Bot = TaskiqDepends()):
@@ -99,7 +99,7 @@ async def daily_newsletter_teacher(teacher_id: int,
 
 
 # Высылаем расписание каждый день в __переданное время__ для учителя
-@worker.task(task_name='activities_day_teacher')
+@worker.task(task_name='daily_schedule_mailing_teacher')
 async def activities_day_teacher(teacher_id: int,
                                  context: Context = TaskiqDepends(),
                                  bot: Bot = TaskiqDepends()):

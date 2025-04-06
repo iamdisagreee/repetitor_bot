@@ -1,6 +1,12 @@
+import uuid
 from datetime import datetime, timedelta, date, time
 from pprint import pprint
+from typing import Dict, List, Any, Optional, Union
 
+from pydantic import Field
+from taskiq import ScheduledTask
+
+from broker import scheduler_storage
 from database import Student
 from lexicon.lexicon_all import LEXICON_ALL
 from lexicon.lexicon_student import LEXICON_STUDENT
@@ -367,3 +373,32 @@ def is_correct_sent_delete_lesson_for_teacher(days_cancellation_notification: in
     return days_cancellation_notification and datetime.now() \
          + timedelta(days=days_cancellation_notification - 1) >= \
         datetime(year=week_date_date.year, month=week_date_date.month, day=week_date_date.day)
+
+# Создаем таску с предварительной проверкой, что она не создана
+async def create_scheduled_task_handler(task_name: str,
+                              labels: Dict[str, Any] = None,
+                              args: List[Any] = None,
+                              kwargs: Dict[str, Any] = None,
+                              schedule_id: str = Field(default_factory=lambda: uuid.uuid4().hex),
+                              cron: Optional[str] = None,
+                              cron_offset: Optional[Union[str, timedelta]] = 'Europe/Moscow',
+                              time: Optional[datetime] = None,
+                          ):
+    if labels is None:
+        labels = dict()
+    if args is None:
+        args = []
+    if kwargs is None:
+        kwargs = dict()
+
+    task = ScheduledTask(task_name=task_name,
+                         labels=labels,
+                         args=args,
+                         kwargs=kwargs,
+                         schedule_id=schedule_id,
+                         cron=cron,
+                         cron_offset=cron_offset,
+                         time=time,
+                         )
+
+    await scheduler_storage.add_schedule(task)

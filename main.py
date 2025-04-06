@@ -20,6 +20,7 @@ from database.base import Base
 from handlers import teacher_handlers, everyone_handlers, student_handlers, other_handlers
 from keyboards.everyone_kb import set_new_menu
 from middlewares.outer import DbSessionMiddleware
+from services.services import create_scheduled_task_handler
 from tasks import student_mailing_lessons, teacher_mailing_lessons
 
 # from tasks import scheduled_payment_verification
@@ -82,31 +83,15 @@ async def main():
     dp.include_router(other_handlers.router)
     dp.update.outer_middleware(DbSessionMiddleware(session_maker))
 
-    # worker.add_dependency_context({
-    #     "session_pool": session_maker,
-    # })
 
-    # await worker.startup()
-    #
-    # await scheduler_storage.startup()
-    # await teacher_mailing_lessons.kiq()
-    # await student_mailing_lessons.kiq()
-
-    # await scheduled_payment_verification.kiq()
-    # Логика настройки проверки оплаты в 23:50 по мск
-    # await scheduler_storage.add_schedule(
-    #     ScheduledTask(
-    #         task_name='scheduled_payment_verification',
-    #         labels={},
-    #         args=[],
-    #         kwargs={},
-    #         cron='*/1 * * * *',
-    #         cron_offset='Europe/Moscow',
-    #         # time=datetime(2025, 3, 10, 18, 10),
-    #         # time=datetime.now(timezone.utc) + timedelta(seconds=10),
-    #         schedule_id=f'scheduled_payment_verification',
-    #     )
-    # )
+    await worker.startup()
+    await scheduler_storage.startup()
+    await create_scheduled_task_handler(task_name='student_mailing_lessons',
+                                        schedule_id='student_mailing_lessons',
+                                        cron='5 * * * *')
+    await create_scheduled_task_handler(task_name='teacher_mailing_lessons',
+                                        schedule_id='teacher_mailing_status',
+                                        cron='5 * * * *')
 
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(

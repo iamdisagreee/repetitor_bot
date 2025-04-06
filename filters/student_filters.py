@@ -14,7 +14,7 @@ from callback_factory.student_factories import ShowDaysOfScheduleCallbackFactory
 from database import Student, LessonWeek, LessonDay
 from database.models import Penalty
 from database.student_requests import give_lessons_week_for_day, give_all_busy_time_intervals, \
-    give_teacher_by_student_id, give_all_lessons_for_day
+    give_teacher_by_student_id, give_all_lessons_for_day, give_all_debts_student
 from services.services import give_list_with_days, give_date_format_fsm, create_choose_time_student, \
     create_delete_time_student, give_time_format_fsm
 
@@ -290,3 +290,11 @@ class IsStudentHasPenalties(BaseFilter):
             )
         )
         return result.scalar()
+
+class IsDebtsStudent(BaseFilter):
+    async def __call__(self, callback: CallbackQuery, session: AsyncSession):
+        list_debts = await give_all_debts_student(session, callback.from_user.id)
+        if list_debts:
+            return {'list_debts': list_debts}
+
+

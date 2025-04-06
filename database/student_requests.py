@@ -4,7 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, delete
 from sqlalchemy.orm import selectinload
 
-from database import Student, LessonDay
+from database import Student, LessonDay, Debtor
 from database.models import Penalty
 from database.models.lesson_week import LessonWeek
 from database.models.teacher import Teacher
@@ -35,7 +35,7 @@ async def command_add_students(session: AsyncSession,
                                class_learning=None,
                                course_learning=None,
                                ):
-    until_minute_notification, until_hour_notification = [int(el) for el in until_time_notification.split(':')]
+    until_hour_notification, until_minute_notification = [int(el) for el in until_time_notification.split(':')]
     student = Student(student_id=student_id,
                       name=name,
                       surname=surname,
@@ -252,3 +252,12 @@ async def delete_gap_lessons_by_student(session: AsyncSession,
     )
 
     await session.execute(stmt)
+
+async def give_all_debts_student(session: AsyncSession,
+                                 student_id: int):
+    list_debts = await session.execute(
+        select(Debtor)
+        .where(Debtor.student_id == student_id)
+    )
+
+    return list_debts.scalars().all()

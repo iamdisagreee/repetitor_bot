@@ -70,6 +70,8 @@ def create_authorization_kb():
                                   callback_data='settings_schedule')],
             [InlineKeyboardButton(text=LEXICON_STUDENT['penalties'],
                                   callback_data='penalties')],
+            [InlineKeyboardButton(text=LEXICON_STUDENT['debts'],
+                                  callback_data='debts')],
             [InlineKeyboardButton(text=LEXICON_STUDENT['settings_student'],
                                   callback_data='settings_student')],
             [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
@@ -334,3 +336,22 @@ def create_confirm_payment_teacher_kb(student_id: int,
     )
 
     return confirm_payment_teacher_kb
+
+def create_debts_student_kb(list_debts):
+    debts_student_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_STUDENT['debt_information']
+                                  .format(debt.week_date.strftime("%m.%d"),
+                                          debt.lesson_on.strftime("%H:%M"),
+                                          debt.lesson_off.strftime("%H:%M"),
+                                          debt.amount_money),
+                                  callback_data='debt_information')]
+            for debt in list_debts
+        ] + [
+            [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
+                                  callback_data='auth_student')]
+        ]
+    )
+
+    return debts_student_kb
+
