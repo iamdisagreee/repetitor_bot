@@ -16,7 +16,8 @@ from callback_factory.student_factories import ChangeStatusOfAddListCallbackFact
 from callback_factory.teacher_factories import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
     DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory, PlugScheduleLessonWeekDayBackFactory, \
-    SentMessagePaymentStudentCallbackFactory, DebtorInformationCallbackFactory, RemoveDebtorFromListCallbackFactory
+    SentMessagePaymentStudentCallbackFactory, DebtorInformationCallbackFactory, RemoveDebtorFromListCallbackFactory, \
+    ShowNextSevenDaysCallbackFactory, ScheduleEditTeacherCallbackFactory
 from database import Student, LessonDay, LessonWeek, AccessStudent
 from database.models import Penalty
 # from database.taskiq_requests import give_scheduled_payment_verification_teachers
@@ -49,13 +50,14 @@ from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb,
     settings_teacher_kb, create_management_students_kb, create_list_add_students_kb, \
     create_back_to_management_students_kb, create_list_delete_students_kb, show_list_of_debtors_kb, back_to_settings_kb, \
     create_notification_confirmation_student_kb, create_list_debtors_kb, change_list_debtors_kb, \
-    show_variants_edit_notifications_kb, create_congratulations_edit_notifications_kb
+    show_variants_edit_notifications_kb, create_congratulations_edit_notifications_kb, create_lessons_week_teacher_kb, \
+    create_config_teacher_kb
 from lexicon.lexicon_all import LEXICON_ALL
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from main import worker
 from services.services import give_list_with_days, give_time_format_fsm, give_date_format_fsm, \
     give_list_registrations_str, show_intermediate_information_lesson_day_status, give_result_info, COUNT_BAN, \
-    course_class_choose, NUMERIC_DATE, create_scheduled_task_handler
+    course_class_choose, NUMERIC_DATE, create_scheduled_task_handler, give_week_day_by_week_date
 from services.services_taskiq import give_available_ids
 from tasks import daily_newsletter_teacher, activities_day_teacher
 
@@ -177,26 +179,53 @@ async def process_start_authorization(callback: CallbackQuery, session: AsyncSes
     await callback.message.edit_text(text=LEXICON_TEACHER['main_menu_authorization'],
                                      reply_markup=create_authorization_kb())
 
+##################################################################################################
+#####################################     ЗАНЯТИЯ       ##########################################
+##################################################################################################
+@router.callback_query(F.data == 'lessons_week_teacher')
+async def process_show_lessons_week(callback: CallbackQuery):
+    next_seven_days_with_cur = give_list_with_days(datetime.now())
+    await callback.message.edit_text(text=LEXICON_TEACHER['header_seven_days_teacher'],
+                                     reply_markup=create_lessons_week_teacher_kb(next_seven_days_with_cur))
+
+
+#Поймали конкретный день - выводим, что можно сделать с этим днем
+@router.callback_query(ShowNextSevenDaysCallbackFactory.filter())
+async def process_menu_config_teacher(callback: CallbackQuery, callback_data: ShowNextSevenDaysCallbackFactory):
+
+    week_date = give_date_format_fsm(callback_data.week_date)
+    await callback.message.edit_text(text=LEXICON_TEACHER['header_config_teacher']
+                                     .format(week_date.strftime("%d.%m"),
+                                             give_week_day_by_week_date(week_date).upper()
+                                             ),
+                                     reply_markup=create_config_teacher_kb(callback_data.week_date))
 
 ################################# Кнопка РЕДАКТИРОВАНИЕ РАСПИСАНИЯ #################################
-@router.callback_query(F.data == 'schedule_teacher')
-async def process_show_schedule(callback: CallbackQuery):
-    next_seven_days_with_cur = give_list_with_days(datetime.now())
+# @router.callback_query(F.data == 'schedule_teacher')
+# async def process_show_schedule(callback: CallbackQuery):
+#     next_seven_days_with_cur = give_list_with_days(datetime.now())
+#
+#     await callback.message.edit_text(text=LEXICON_TEACHER['schedule_teacher_menu'],
+#                                      reply_markup=show_next_seven_days_kb(next_seven_days_with_cur))
 
-    await callback.message.edit_text(text=LEXICON_TEACHER['schedule_teacher_menu'],
-                                     reply_markup=show_next_seven_days_kb(next_seven_days_with_cur))
 
-
+# # Выбираем кнопку __ДОБАВИТЬ__ или __УДАЛИТЬ__ !
+# @router.callback_query(FindNextSevenDaysFromKeyboard())
+# async def process_menu_add_remove(callback: CallbackQuery, state: FSMContext):
+#     await state.update_data(week_date=callback.data)
+#
+#     await callback.message.edit_text(text=LEXICON_TEACHER['schedule_changes_add_remove'],
+#                                      reply_markup=create_add_remove_gap_kb())
 # Выбираем кнопку __ДОБАВИТЬ__ или __УДАЛИТЬ__ !
-@router.callback_query(FindNextSevenDaysFromKeyboard())
-async def process_menu_add_remove(callback: CallbackQuery, state: FSMContext):
-    await state.update_data(week_date=callback.data)
+@router.callback_query(ScheduleEditTeacherCallbackFactory.filter())
+async def process_menu_add_remove(callback: CallbackQuery, state: FSMContext,
+                                  callback_data: ScheduleEditTeacherCallbackFactory):
+    await state.update_data(week_date=callback_data.week_date)
 
     await callback.message.edit_text(text=LEXICON_TEACHER['schedule_changes_add_remove'],
-                                     reply_markup=create_add_remove_gap_kb())
+                                     reply_markup=create_add_remove_gap_kb(callback_data.week_date))
 
-
-########################## Случай, когда сработала кнока __ДОБАВИТЬ__! ######################################
+########################## Случай, когда сработала кнопка __ДОБАВИТЬ__! ######################################
 @router.callback_query(F.data == 'add_gap_teacher')
 async def process_create_day_schedule(callback: CallbackQuery, state: FSMContext):
     await callback.message.answer(text=LEXICON_TEACHER['add_time_start']
@@ -321,7 +350,7 @@ async def process_start_in_range(message: Message, work_start: time,
 
 ###########КОНЕЦ ФИЛЬТРОВ ДЛЯ ОКОНЧАНИЯ ЗАНЯТИЙ
 
-########################## Случай, когда сработала кнока __удалить__! ######################################
+########################## Случай, когда сработала кнопка __УДАЛИТЬ__! ######################################
 @router.callback_query(F.data == 'remove_gap_teacher', IsLessonWeekInDatabase())
 async def process_create_day_schedule_delete(callback: CallbackQuery, session: AsyncSession,
                                              week_date: date):
@@ -330,7 +359,8 @@ async def process_create_day_schedule_delete(callback: CallbackQuery, session: A
                                                    week_date)
 
     await callback.message.edit_text(text=LEXICON_TEACHER['delete_time_start'],
-                                     reply_markup=create_all_records_week_day(weeks_days))
+                                     reply_markup=create_all_records_week_day(weeks_days,
+                                                                              str(week_date)))
 
 
 # Проверяем, что кнопка с датой нажата и удаляем
@@ -350,7 +380,8 @@ async def process_delete_week_day(callback: CallbackQuery, session: AsyncSession
     await state.clear()
 
     await callback.message.edit_text(text=LEXICON_TEACHER['delete_time_start'],
-                                     reply_markup=create_all_records_week_day(weeks_days))
+                                     reply_markup=create_all_records_week_day(weeks_days,
+                                                                              week_date_str))
 
 
 # Случай, когда нечего удалять из созданных промежутков!
@@ -361,11 +392,11 @@ async def process_create_day_schedule_nothing(callback: CallbackQuery):
 
 ########################### Кнопка __ПОДТВЕРЖДЕНИЕ ОПЛАТЫ__ ########################
 # Предоставляем выбор дат для просмотра оплаты
-@router.callback_query(F.data == 'confirmation_pay')
-async def process_confirmation_pay(callback: CallbackQuery):
-    next_seven_days_with_cur = give_list_with_days(datetime.now())
-    await callback.message.edit_text(text=LEXICON_TEACHER['confirmation_pay_menu'],
-                                     reply_markup=show_next_seven_days_pay_kb(*next_seven_days_with_cur))
+# @router.callback_query(F.data == 'confirmation_pay')
+# async def process_confirmation_pay(callback: CallbackQuery):
+#     next_seven_days_with_cur = give_list_with_days(datetime.now())
+#     await callback.message.edit_text(text=LEXICON_TEACHER['confirmation_pay_menu'],
+#                                      reply_markup=show_next_seven_days_pay_kb(*next_seven_days_with_cur))
 
 
 # Вываливаем список учеников в выбранный день, ❌ - не оплачено; ✅ - оплачено
@@ -508,13 +539,13 @@ async def process_change_status_payment_message(callback: CallbackQuery, session
                            )
 
 ########################################## кнопка МОЕ РАСПИСАНИЕ ######################################
-@router.callback_query(F.data == 'schedule_show')
-async def process_show_my_schedule(callback: CallbackQuery):
-    next_seven_days_with_cur = give_list_with_days(datetime.now())
-    await callback.message.edit_text(text=LEXICON_TEACHER['my_schedule_menu'],
-                                     reply_markup=show_next_seven_days_schedule_teacher_kb(
-                                         *next_seven_days_with_cur)
-                                     )
+# @router.callback_query(F.data == 'schedule_show')
+# async def process_show_my_schedule(callback: CallbackQuery):
+#     next_seven_days_with_cur = give_list_with_days(datetime.now())
+#     await callback.message.edit_text(text=LEXICON_TEACHER['my_schedule_menu'],
+#                                      reply_markup=show_next_seven_days_schedule_teacher_kb(
+#                                          *next_seven_days_with_cur)
+#                                      )
 
 
 # Ловим апдейт с конкретным днем, и показываем все временные промежутки за день

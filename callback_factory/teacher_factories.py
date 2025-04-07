@@ -1,4 +1,5 @@
 import uuid
+from sys import prefix
 from uuid import UUID
 
 from aiogram.filters.callback_data import CallbackData
@@ -8,6 +9,18 @@ from database import Student
 
 class DeleteDayCallbackFactory(CallbackData, prefix='delete'):
     week_id: UUID
+
+class ShowNextSevenDaysCallbackFactory(CallbackData, prefix='week_date',sep=';'):
+    week_date: str
+
+class ScheduleEditTeacherCallbackFactory(CallbackData, prefix='edit', sep=';'):
+    week_date: str
+
+class ScheduleShowTeacherCallbackFactory(CallbackData, prefix='show', sep=';'):
+    week_date: str
+
+class SettingsPayTeacherCallbackFactory(CallbackData, prefix='pay', sep=';'):
+    week_date: str
 
 
 class ShowDaysOfPayCallbackFactory(CallbackData, prefix='pay'):

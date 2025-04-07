@@ -24,6 +24,16 @@ NUMBER_DAYS = 7
 NUMBER_ENTRIES = 9
 COUNT_BAN = 3
 
+
+def give_week_day_by_week_date(week_date: date):
+    return NUMERIC_DATE[date(
+        year=week_date.year,
+        month=week_date.month,
+        day=week_date.day
+    ).isoweekday()
+    ]
+
+
 def give_list_with_days(get_date: datetime):
     result_date = []
 
@@ -297,7 +307,7 @@ def give_my_penalty_format(count_time_to_penalty):
     if hour < 10:
         hour = '0' + str(hour)
     if minute < 10:
-        minute = '0'+str(minute)
+        minute = '0' + str(minute)
     return f'{hour}:{minute}'
 
 
@@ -308,7 +318,6 @@ def give_text_information_lesson(student: Student,
                                  lesson_off: time,
                                  result_status,
                                  counter_lessons):
-
     # Смотрим, что со статусом
     status_info = give_result_info(result_status)
 
@@ -349,16 +358,17 @@ def course_class_choose(class_learning,
     return f'{class_learning} класс' if class_learning \
         else f'{course_learning} класс'
 
-#Получаем список всех интервалов из заданного интервала: [lesson_on; lesson_off]
+
+# Получаем список всех интервалов из заданного интервала: [lesson_on; lesson_off]
 def create_list_gaps_by_time_on_and_off(week_date: date,
                                         lesson_on: time,
                                         lesson_off: time):
     lesson_on_dt = datetime(year=week_date.year, month=week_date.month,
                             day=week_date.day, hour=lesson_on.hour,
                             minute=lesson_on.minute)
-    lesson_off_dt=datetime(year=week_date.year, month=week_date.month,
-                           day=week_date.day, hour=lesson_off.hour,
-                           minute=lesson_off.minute)
+    lesson_off_dt = datetime(year=week_date.year, month=week_date.month,
+                             day=week_date.day, hour=lesson_off.hour,
+                             minute=lesson_off.minute)
     list_gaps_time = []
     while lesson_on_dt != lesson_off_dt:
         list_gaps_time.append(time(hour=lesson_on_dt.hour,
@@ -367,23 +377,24 @@ def create_list_gaps_by_time_on_and_off(week_date: date,
 
     return list_gaps_time
 
+
 def is_correct_sent_delete_lesson_for_teacher(days_cancellation_notification: int,
                                               week_date_date):
-
     return days_cancellation_notification and datetime.now() \
-         + timedelta(days=days_cancellation_notification - 1) >= \
+        + timedelta(days=days_cancellation_notification - 1) >= \
         datetime(year=week_date_date.year, month=week_date_date.month, day=week_date_date.day)
+
 
 # Создаем таску с предварительной проверкой, что она не создана
 async def create_scheduled_task_handler(task_name: str,
-                              labels: Dict[str, Any] = None,
-                              args: List[Any] = None,
-                              kwargs: Dict[str, Any] = None,
-                              schedule_id: str = Field(default_factory=lambda: uuid.uuid4().hex),
-                              cron: Optional[str] = None,
-                              cron_offset: Optional[Union[str, timedelta]] = 'Europe/Moscow',
-                              time: Optional[datetime] = None,
-                          ):
+                                        labels: Dict[str, Any] = None,
+                                        args: List[Any] = None,
+                                        kwargs: Dict[str, Any] = None,
+                                        schedule_id: str = Field(default_factory=lambda: uuid.uuid4().hex),
+                                        cron: Optional[str] = None,
+                                        cron_offset: Optional[Union[str, timedelta]] = 'Europe/Moscow',
+                                        time: Optional[datetime] = None,
+                                        ):
     if labels is None:
         labels = dict()
     if args is None:
