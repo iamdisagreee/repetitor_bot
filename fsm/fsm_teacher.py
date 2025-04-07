@@ -20,3 +20,18 @@ class FSMRegistrationLessonWeek(StatesGroup):
 
 class FSMAddStudentToStudy(StatesGroup):
     fill_id = State()
+
+class FSMSetUntilTimeNotificationTeacher(StatesGroup):
+    fill_until_time_notification = State()
+
+class FSMSetDailyScheduleMailing(StatesGroup):
+    fill_daily_schedule_mailing_time = State()
+
+class FSMSetDailyReportMailing(StatesGroup):
+    fill_daily_report_mailing_time = State()
+
+class FSMSetCancellationNotificationTeacher(StatesGroup):
+    fill_cancellation_notification = State()
+
+
+

@@ -51,9 +51,9 @@ from services.services_taskiq import check_is_30_minutes_between, give_correct_t
 #
 # print(result_sent_time, until_hour, until_minute)
 
-
-a = {(1,2,3): 'a'}
-print(a)
+#
+# a = {(1,2,3): 'a'}
+# print(a)
 
 # print(datetime.now() + timedelta(minutes=10) > datetime.now())
 

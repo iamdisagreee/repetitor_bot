@@ -63,6 +63,8 @@ async def give_lessons_for_day_students(session: AsyncSession):
     group_dict = defaultdict(lambda: defaultdict(list))
 
     for lesson in lessons:
+        if lesson.student.until_hour_notification is None:
+            continue
         group_dict[lesson.student_id][lesson.week_date].append(lesson)
 
     return group_dict
@@ -87,6 +89,8 @@ async def give_lessons_for_day_teacher(session: AsyncSession):
     group_dict = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
 
     for lesson in lessons:
+        if lesson.student.teacher.until_hour_notification is None:
+            continue
         group_dict[lesson.student.teacher.teacher_id][lesson.student_id][lesson.week_date].append(lesson)
 
     return group_dict

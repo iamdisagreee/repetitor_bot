@@ -35,6 +35,9 @@ async def daily_newsletter_teacher(teacher_id: int,
     async with context.state.session_pool() as session:
         teacher = await give_information_for_day(session, teacher_id)
 
+    if teacher.daily_report_mailing_time is None:
+        return
+
     result_debtors, general_information = give_data_config_teacher(teacher)
     text = ''
     # print(result_debtors)
@@ -106,6 +109,8 @@ async def activities_day_teacher(teacher_id: int,
     async with context.state.session_pool() as session:
         teacher = await give_information_for_day(session,
                                                  teacher_id)
+    if teacher.daily_schedule_mailing_time is None:
+        return
 
     result_schedule = give_everyday_schedule(teacher)
     text_schedule = create_schedule_like_text(result_schedule)

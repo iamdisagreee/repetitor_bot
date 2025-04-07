@@ -68,15 +68,15 @@ async def main():
     await set_new_menu(bot)
 
     session_maker = async_sessionmaker(engine)
-    async with session_maker() as session:
-        debtor = Debtor(teacher_id=7880267101,
-                        student_id=859717714,
-                        week_date=date(2025, 4, 2),
-                        lesson_on=time(11,30),
-                        lesson_off=time(12, 30),
-                        amount_money=1000)
-        session.add(debtor)
-        await session.commit()
+    # async with session_maker() as session:
+    #     debtor = Debtor(teacher_id=7880267101,
+    #                     student_id=859717714,
+    #                     week_date=date(2025, 4, 2),
+    #                     lesson_on=time(11,30),
+    #                     lesson_off=time(12, 30),
+    #                     amount_money=1000)
+    #     session.add(debtor)
+    #     await session.commit()
     dp.include_router(everyone_handlers.router)
     dp.include_router(student_handlers.router)
     dp.include_router(teacher_handlers.router)
@@ -88,10 +88,10 @@ async def main():
     await scheduler_storage.startup()
     await create_scheduled_task_handler(task_name='student_mailing_lessons',
                                         schedule_id='student_mailing_lessons',
-                                        cron='5 * * * *')
+                                        cron='*/5 * * * *')
     await create_scheduled_task_handler(task_name='teacher_mailing_lessons',
                                         schedule_id='teacher_mailing_status',
-                                        cron='5 * * * *')
+                                        cron='*/5 * * * *')
 
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(

@@ -16,11 +16,16 @@ class Teacher(Base):
     phone: Mapped[str] = mapped_column(String)
     bank: Mapped[str] = mapped_column(String)
     penalty: Mapped[int] = mapped_column(Integer)
-    until_hour_notification: Mapped[int] = mapped_column(Integer)
-    until_minute_notification: Mapped[int] = mapped_column(Integer)
-    daily_schedule_mailing_time: Mapped[time] = mapped_column(Time)
-    daily_report_mailing_time: Mapped[time] = mapped_column(Time)
-    days_cancellation_notification: Mapped[int] = mapped_column(Integer)
+    until_hour_notification: Mapped[int] = mapped_column(Integer,
+                                                         nullable=True)
+    until_minute_notification: Mapped[int] = mapped_column(Integer,
+                                                           nullable=True)
+    daily_schedule_mailing_time: Mapped[time] = mapped_column(Time,
+                                                              nullable=True)
+    daily_report_mailing_time: Mapped[time] = mapped_column(Time,
+                                                            nullable=True)
+    days_cancellation_notification: Mapped[int] = mapped_column(Integer,
+                                                                nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

@@ -303,6 +303,8 @@ def settings_teacher_kb():
         inline_keyboard=[
             [InlineKeyboardButton(text=LEXICON_TEACHER['information_teacher'],
                                   callback_data='my_profile')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['notifications_teacher'],
+                                  callback_data='notifications_teacher')],
             [InlineKeyboardButton(text=LEXICON_TEACHER['registration_again'],
                                   callback_data='edit_profile')],
             [InlineKeyboardButton(text=LEXICON_TEACHER['delete_profile'],
@@ -314,6 +316,31 @@ def settings_teacher_kb():
 
     return settings_teacher
 
+def show_variants_edit_notifications_kb():
+    variants_edit_notifications_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_TEACHER['until_time_notification_button'],
+                                  callback_data='set_until_time_notification')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['daily_schedule_mailing_time_button'],
+                                  callback_data='set_daily_schedule_mailing_time')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['daily_report_mailing_time_button'],
+                                  callback_data='set_daily_report_mailing_time')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['cancellation_notification'],
+                                  callback_data='set_cancellation_notification')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
+                                  callback_data='settings_teacher')]
+        ]
+    )
+    return variants_edit_notifications_kb
+
+def create_congratulations_edit_notifications_kb():
+    notification_confirmation_student_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
+                                  callback_data='notifications_teacher')]
+        ]
+    )
+    return notification_confirmation_student_kb
 
 def back_to_settings_kb():
     back_to_settings = [
@@ -468,3 +495,4 @@ def change_list_debtors_kb(list_debtors):
         ]
     )
     return list_debtors
+
