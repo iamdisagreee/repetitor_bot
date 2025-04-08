@@ -7,7 +7,8 @@ from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyA
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
     StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory, InformationLessonCallbackFactory, \
     RemoveDayOfScheduleCallbackFactory
-from callback_factory.teacher_factories import SentMessagePaymentStudentCallbackFactory
+from callback_factory.teacher_factories import SentMessagePaymentStudentCallbackFactory, \
+    ScheduleShowTeacherCallbackFactory, ShowInfoDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory
 from lexicon.lexicon_student import LEXICON_STUDENT
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from services.services import NUMERIC_DATE
@@ -270,9 +271,15 @@ def create_button_for_back_to_all_lessons_day(week_date_str,
 
     return button_for_back_to_all_lessons_day
 
-def create_ok_remove_day_schedule_student_kb():
+def create_ok_remove_day_schedule_student_kb(week_date):
     ok_remove_day_schedule_student_kb = InlineKeyboardMarkup(
         inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_STUDENT['to_schedule'],
+                                  callback_data=ShowDaysOfScheduleTeacherCallbackFactory(
+                                      week_date=week_date
+                                  ).pack()
+                                  )
+             ],
             [InlineKeyboardButton(text=LEXICON_STUDENT['ok'],
                                   callback_data='ok_remove_day_schedule_student')]
         ]

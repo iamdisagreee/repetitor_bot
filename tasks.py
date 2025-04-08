@@ -20,7 +20,7 @@ from keyboards.taskiq_kb import create_confirmation_day_teacher_kb, create_confi
     create_notice_lesson_certain_time_student_ok, create_notice_lesson_certain_time_teacher_ok
 from lexicon.lexicon_taskiq import LEXICON_TASKIQ
 from services.services import NUMERIC_DATE, give_date_format_fsm, show_intermediate_information_lesson_day_status, \
-    give_time_format_fsm
+    give_time_format_fsm, give_week_day_by_week_date
 from services.services_taskiq import give_data_config_teacher, give_everyday_schedule, create_schedule_like_text, \
     check_is_30_minutes_between, create_scheduled_task, change_to_specified_time, \
     give_correct_time_schedule_before_lesson, delete_unnecessary_tasks_teacher, give_dictionary_tasks_teacher, \
@@ -40,13 +40,12 @@ async def daily_newsletter_teacher(teacher_id: int,
 
     result_debtors, general_information = give_data_config_teacher(teacher)
     text = ''
-    # print(result_debtors)
     for lesson in result_debtors:
         text += f" - {lesson['student_name']} {lesson['student_surname']} {int(lesson['amount_money'])}р." \
                 f"{lesson['lesson_on'].strftime('%H:%M')}-{lesson['lesson_off'].strftime('%H:%M')}\n"
     await bot.send_message(chat_id=teacher_id,
                            text=LEXICON_TASKIQ['info_non_payment_teacher']
-                           .format(datetime.now().strftime("%d.%m"),
+                           .format(datetime.now().strftime("%d.%m"), give_week_day_by_week_date(date.today()),
                                    f"{general_information['amount_time'] // 3600} ч."
                                    f" {general_information['amount_time'] // 60 % 60} мин.",
                                    int(general_information['amount_money_yes']),
@@ -56,7 +55,6 @@ async def daily_newsletter_teacher(teacher_id: int,
                            )
     print('Сообщение отправлено преподавателю!')
     # Добавляем учеников в таблицу должников
-    # uniq_debtors = set(debtor['teacher_id'] for debtor in result_debtors)
     async with context.state.session_pool() as session:
         for lesson in result_debtors:
             debtor = Debtor(
@@ -77,6 +75,7 @@ async def daily_newsletter_teacher(teacher_id: int,
                     await bot.send_message(chat_id=student['student_id'],
                                            text=LEXICON_TASKIQ['forget_paid_students']
                                            .format(datetime.now().strftime("%d.%m"),
+                                                   give_week_day_by_week_date(date.today()),
                                                    student['lesson_on'].strftime("%H:%M"),
                                                    student['lesson_off'].strftime("%H:%M"),
                                                    student['amount_money']

@@ -117,7 +117,10 @@ def create_config_teacher_kb(week_date: str):
                              ],
                         ] + [
                             [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
-                                                  callback_data='lessons_week_teacher')]
+                                                  callback_data='lessons_week_teacher'),
+                             InlineKeyboardButton(text=LEXICON_TEACHER['home'],
+                                                  callback_data='auth_teacher')
+                             ]
                         ]
     )
 

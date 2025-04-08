@@ -17,10 +17,12 @@ from database import AccessStudent, Debtor
 from aiogram.fsm.storage.redis import RedisStorage
 
 from database.base import Base
+from database.teacher_requests import delete_teacher_profile
 from handlers import teacher_handlers, everyone_handlers, student_handlers, other_handlers
 from keyboards.everyone_kb import set_new_menu
 from middlewares.outer import DbSessionMiddleware
 from services.services import create_scheduled_task_handler
+from services.services_taskiq import delete_all_schedules_teacher
 from tasks import student_mailing_lessons, teacher_mailing_lessons
 
 # from tasks import scheduled_payment_verification
@@ -77,6 +79,7 @@ async def main():
     #                     amount_money=1000)
     #     session.add(debtor)
     #     await session.commit()
+
     dp.include_router(everyone_handlers.router)
     dp.include_router(student_handlers.router)
     dp.include_router(teacher_handlers.router)
@@ -86,12 +89,13 @@ async def main():
 
     await worker.startup()
     await scheduler_storage.startup()
-    await create_scheduled_task_handler(task_name='student_mailing_lessons',
-                                        schedule_id='student_mailing_lessons',
-                                        cron='*/5 * * * *')
-    await create_scheduled_task_handler(task_name='teacher_mailing_lessons',
-                                        schedule_id='teacher_mailing_status',
-                                        cron='*/5 * * * *')
+    await delete_all_schedules_teacher(7880267101)
+    # await create_scheduled_task_handler(task_name='student_mailing_lessons',
+    #                                     schedule_id='student_mailing_lessons',
+    #                                     cron='*/5 * * * *')
+    # await create_scheduled_task_handler(task_name='teacher_mailing_lessons',
+    #                                     schedule_id='teacher_mailing_status',
+    #                                     cron='*/5 * * * *')
 
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(

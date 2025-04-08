@@ -707,7 +707,9 @@ async def process_remove_lesson_student(callback: CallbackQuery, bot: Bot, sessi
                                                          day=week_date_date.day).isoweekday()],
                                        lesson_on_time.strftime("%H:%M"),
                                        lesson_off_time.strftime("%H:%M")),
-                               reply_markup=create_ok_remove_day_schedule_student_kb()
+                               reply_markup=create_ok_remove_day_schedule_student_kb(
+                                   callback_data.week_date
+                               )
                                )
     await session.commit()
 

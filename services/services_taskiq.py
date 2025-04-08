@@ -277,3 +277,19 @@ async def delete_unnecessary_tasks_teacher(teacher_id,
                     give_result_time.student_mailing_status = 0
                 else:
                     break
+
+# Удаляем все таски у учителя
+async def delete_all_schedules_teacher(teacher_id: int):
+    different_tasks = {f'b_l_t_{teacher_id}',
+                          f'd_r_t_{teacher_id}',
+                          f'd_s_t_{teacher_id}'}
+    for task in await scheduler_storage.get_schedules():
+        if task.schedule_id in different_tasks:
+            await scheduler_storage.delete_schedule(task.schedule_id)
+
+# Удаляем все таски у ученика
+async def delete_all_schedules_student(student_id: int):
+    different_tasks = {f'b_l_s_{student_id}'}
+    for task in await scheduler_storage.get_schedules():
+        if task.schedule_id in different_tasks:
+            await scheduler_storage.delete_schedule(task.schedule_id)

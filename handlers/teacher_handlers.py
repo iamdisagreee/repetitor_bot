@@ -12,6 +12,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from taskiq_nats import NATSKeyValueScheduleSource
 from taskiq import Context, TaskiqDepends, ScheduledTask
 import time as t
+
+from broker import scheduler_storage
 from callback_factory.student_factories import ChangeStatusOfAddListCallbackFactory, DeleteStudentToStudyCallbackFactory
 from callback_factory.teacher_factories import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
@@ -58,7 +60,7 @@ from main import worker
 from services.services import give_list_with_days, give_time_format_fsm, give_date_format_fsm, \
     give_list_registrations_str, show_intermediate_information_lesson_day_status, give_result_info, COUNT_BAN, \
     course_class_choose, NUMERIC_DATE, create_scheduled_task_handler, give_week_day_by_week_date
-from services.services_taskiq import give_available_ids
+from services.services_taskiq import give_available_ids, delete_all_schedules_teacher
 from tasks import daily_newsletter_teacher, activities_day_teacher
 
 # Ученик - ничего не происходит
@@ -553,8 +555,12 @@ async def process_change_status_payment_message(callback: CallbackQuery, session
 async def process_show_schedule_teacher(callback: CallbackQuery, session: AsyncSession,
                                         list_lessons_not_formatted: list[LessonWeek],
                                         week_date_str: str):
+    week_date = give_date_format_fsm(week_date_str)
+
     intermediate_buttons = show_intermediate_information_lesson_day_status(list_lessons_not_formatted)
-    await callback.message.edit_text(text=LEXICON_TEACHER['schedule_lesson_day'],
+    await callback.message.edit_text(text=LEXICON_TEACHER['schedule_lesson_day']
+                                     .format(week_date.strftime("%d.%m"),
+                                             give_week_day_by_week_date(week_date)),
                                      reply_markup=await show_schedule_lesson_day_kb(session,
                                                                                     intermediate_buttons,
                                                                                     week_date_str)
@@ -638,16 +644,25 @@ async def process_show_settings(callback: CallbackQuery):
 async def process_show_teacher_profile(callback: CallbackQuery, session: AsyncSession):
     teacher = await give_teacher_profile_by_teacher_id(session,
                                                        callback.from_user.id)
+    until_hour_notification = teacher.until_hour_notification if teacher.until_hour_notification else '-'
+    until_minute_notification = teacher.until_minute_notification if teacher.until_minute_notification else '-'
+    daily_schedule_mailing_time = teacher.daily_schedule_mailing_time.strftime("%H:%M") if \
+        teacher.daily_schedule_mailing_time else '-'
+    daily_report_mailing_time = teacher.daily_report_mailing_time.strftime("%H:%M") if \
+        teacher.daily_report_mailing_time else '-'
+    days_cancellation_notification = teacher.days_cancellation_notification if \
+        teacher.days_cancellation_notification else '-'
+
     await callback.message.edit_text(text=LEXICON_TEACHER['information_about_teacher']
                                      .format(teacher.surname,
                                              teacher.name,
                                              teacher.phone,
                                              teacher.bank,
-                                             teacher.until_hour_notification,
-                                             teacher.until_minute_notification,
-                                             teacher.daily_schedule_mailing_time.strftime("%H:%M"),
-                                             teacher.daily_report_mailing_time.strftime("%H:%M"),
-                                             teacher.days_cancellation_notification,
+                                             until_hour_notification,
+                                             until_minute_notification,
+                                             daily_schedule_mailing_time,
+                                             daily_report_mailing_time,
+                                             days_cancellation_notification,
                                              ),
                                      reply_markup=back_to_settings_kb())
 
@@ -700,7 +715,7 @@ async def process_give_daily_schedule(message: Message, state: FSMContext,
 
     await create_scheduled_task_handler(task_name='daily_schedule_mailing_teacher',
                                         kwargs={'teacher_id': message.from_user.id},
-                                        schedule_id=f'd_s_{message.from_user.id}',
+                                        schedule_id=f'd_s_t_{message.from_user.id}',
                                         cron=f'{minute} {hour} * * *')
     await message.answer(LEXICON_TEACHER['congratulations_edit_notices'],
                          reply_markup=create_congratulations_edit_notifications_kb())
@@ -727,7 +742,7 @@ async def process_give_daily_report(message: Message, state: FSMContext,
 
     await create_scheduled_task_handler(task_name='daily_report_mailing_teacher',
                                         kwargs={'teacher_id': message.from_user.id},
-                                        schedule_id=f'd_r_{message.from_user.id}',
+                                        schedule_id=f'd_r_t_{message.from_user.id}',
                                         cron=f'{minute} {hour} * * *')
     await message.answer(LEXICON_TEACHER['congratulations_edit_notices'],
                          reply_markup=create_congratulations_edit_notifications_kb())
@@ -788,7 +803,8 @@ async def process_restart_registration(callback: CallbackQuery, state: FSMContex
 async def process_delete_profile(callback: CallbackQuery, session: AsyncSession):
     await delete_teacher_profile(session,
                                  callback.from_user.id)
-
+    # Удаляем все таски у ученика
+    await delete_all_schedules_teacher(callback.from_user.id)
     await callback.message.edit_text(text=LEXICON_ALL['start'],
                                      reply_markup=create_start_kb())
 
@@ -972,7 +988,7 @@ async def process_confirmation_day_teacher(callback: CallbackQuery, bot: Bot):
 async def create_notice_lesson_certain_time_student(callback: CallbackQuery, bot: Bot):
     await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
 
-# Нажимаем __ОК__, когда пришло уведомление об отмене занятия
+# Нажимаем __ОК__, когда пришло уведомление об отмене занятияX
 @router.callback_query(F.data == 'ok_remove_day_schedule_student')
 async def create_ok_remove_day_schedule_student(callback: CallbackQuery, bot: Bot):
     await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)

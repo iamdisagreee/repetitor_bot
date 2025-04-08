@@ -48,4 +48,5 @@ class Student(Base):
 
     access: Mapped["access_student.AccessStudent"] = relationship(back_populates='student')
 
-    debtors: Mapped[list["debtor.Debtor"]] = relationship(back_populates='student')
+    debtors: Mapped[list["debtor.Debtor"]] = relationship(back_populates='student',
+                                                            cascade='delete')
