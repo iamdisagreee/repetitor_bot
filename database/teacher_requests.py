@@ -459,11 +459,42 @@ async def give_list_debtors(session: AsyncSession,
     return list_debtors.scalars().all()
 
 
-async def remove_debtor_from_list(session: AsyncSession,
-                                  debtor_id: UUID):
+async def remove_debtor_from_list_by_id(session: AsyncSession,
+                                        debtor_id: UUID):
     await session.execute(
         delete(Debtor)
         .where(Debtor.debtor_id == debtor_id)
+    )
+    await session.commit()
+
+async def remove_debtor_from_list_by_info(session: AsyncSession,
+                                          student_id: int,
+                                          week_date: date,
+                                          lesson_on: time,
+                                          lesson_off: time):
+    print(week_date)
+    x = (await session.execute(
+        select(Debtor)
+        .where(
+            and_(
+                Debtor.student_id == student_id,
+            )
+        )
+    )).scalar()
+    print(x.student_id,
+          x.lesson_on,
+          x.week_date)
+    print(x)
+    await session.execute(
+        delete(Debtor)
+        .where(
+            and_(
+                Debtor.student_id == student_id,
+                Debtor.week_date == week_date,
+                Debtor.lesson_on == lesson_on,
+                Debtor.lesson_off == lesson_off
+            )
+        )
     )
     await session.commit()
 

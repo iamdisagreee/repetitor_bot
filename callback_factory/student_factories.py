@@ -4,11 +4,15 @@ from sys import prefix
 
 from aiogram.filters.callback_data import CallbackData
 
+class ShowNextSevenDaysStudentCallbackFactory(CallbackData, prefix='week_date', sep=';'):
+    week_date: str
+
+class ScheduleEditStudentCallbackFactory(CallbackData, prefix='edit', sep=';'):
+    week_date: str
 
 class ExistFieldCallbackFactory(CallbackData, prefix="time", sep='-'):
     lesson_start: str
     lesson_finished: str
-
 
 # Фабрика колбеков (несуществующие кнопки)
 class EmptyAddFieldCallbackFactory(CallbackData, prefix='plug'):
@@ -19,7 +23,6 @@ class DeleteFieldCallbackFactory(CallbackData, prefix='delete', sep=';'):
     lesson_start: str
     lesson_finished: str
     week_date: str
-
 
 class EmptyRemoveFieldCallbackFactory(CallbackData, prefix='plug'):
     plug: str
@@ -58,3 +61,4 @@ class InformationLessonCallbackFactory(CallbackData, prefix='a', sep=';'):
     lesson_on: str
     lesson_off: str
     full_price: int
+

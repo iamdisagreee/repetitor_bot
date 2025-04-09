@@ -60,6 +60,7 @@ async def daily_newsletter_teacher(teacher_id: int,
             debtor = Debtor(
                 teacher_id=teacher_id,
                 student_id=lesson['student_id'],
+                week_date=date.today(),
                 lesson_on=lesson['lesson_on'],
                 lesson_off=lesson['lesson_off'],
                 amount_money=lesson['amount_money']
@@ -113,9 +114,9 @@ async def activities_day_teacher(teacher_id: int,
 
     result_schedule = give_everyday_schedule(teacher)
     text_schedule = create_schedule_like_text(result_schedule)
-
     await bot.send_message(chat_id=teacher_id, text=LEXICON_TASKIQ['give_everyday_schedule']
-                           .format(text_schedule))
+                           .format(text_schedule),
+                           reply_markup=create_confirmation_day_teacher_kb())
 
 # Уведомление о занятии за какое-то время до начала
 @worker.task(task_name='student_mailing_lessons')

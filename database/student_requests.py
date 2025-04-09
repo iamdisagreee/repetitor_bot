@@ -31,11 +31,20 @@ async def command_add_students(session: AsyncSession,
                                subject,
                                teacher_id: str,
                                price,
-                               until_time_notification,
+                               until_hour_notification=None,
+                               until_minute_notification=None,
                                class_learning=None,
                                course_learning=None,
                                ):
-    until_hour_notification, until_minute_notification = [int(el) for el in until_time_notification.split(':')]
+    student_cur = (await session.execute(
+        select(Student)
+        .where(Student.student_id == student_id)
+    )).scalar()
+
+    if student_cur is not None:
+        until_hour_notification = student_cur.until_hour_notification
+        until_minute_notification = student_cur.until_minute_notification
+
     student = Student(student_id=student_id,
                       name=name,
                       surname=surname,
@@ -49,17 +58,6 @@ async def command_add_students(session: AsyncSession,
                       until_hour_notification=until_hour_notification,
                       until_minute_notification=until_minute_notification
                       )
-    # Получаем teacher_id, если он есть. И сравниваем с добавляемым
-    # Если он изменился, то чистим все занятия
-    # last_teacher_id = (await session.execute(
-    #     select(Teacher.teacher_id)
-    #     .where(Student.student_id == student_id)
-    # )).scalar()
-    # if last_teacher_id is not None:
-    #     if last_teacher_id != int(teacher_id):
-    #         stmt = (delete(LessonWeek).where(LessonWeek.teacher_id == int(teacher_id)))
-    #         await session.execute(stmt)
-
     await session.merge(student)
     await session.commit()
 
@@ -150,7 +148,7 @@ async def give_all_lessons_for_day(session: AsyncSession,
                                    week_date: date,
                                    student_id: int):
     now = datetime.now()
- 
+
     all_lessons_for_day = await session.execute(
         select(LessonDay)
         .where(
@@ -219,9 +217,9 @@ async def give_information_of_lesson(session: AsyncSession,
 
 async def delete_student_profile(session: AsyncSession,
                                  student_id: int):
-    profile = await session.execute(select(Student)
+    await session.execute(delete(Student)
                                     .where(Student.student_id == student_id))
-    await session.delete(profile.scalar())
+    await session.commit()
 
 
 async def give_students_penalty(session: AsyncSession,
@@ -233,6 +231,7 @@ async def give_students_penalty(session: AsyncSession,
 
     return student_penalties.scalars().all()
 
+
 # Удаляем все интервалы из переданного списка
 async def delete_gap_lessons_by_student(session: AsyncSession,
                                         student_id: int,
@@ -242,16 +241,17 @@ async def delete_gap_lessons_by_student(session: AsyncSession,
     stmt = (
         delete(LessonDay)
         .where(
-                and_(
-                    LessonDay.student_id == student_id,
-                    LessonDay.week_date == week_date,
-                    LessonDay.lesson_start >= lesson_on,
-                    LessonDay.lesson_finished <= lesson_off
-                )
+            and_(
+                LessonDay.student_id == student_id,
+                LessonDay.week_date == week_date,
+                LessonDay.lesson_start >= lesson_on,
+                LessonDay.lesson_finished <= lesson_off
+            )
         )
     )
 
     await session.execute(stmt)
+
 
 async def give_all_debts_student(session: AsyncSession,
                                  student_id: int):
@@ -261,3 +261,17 @@ async def give_all_debts_student(session: AsyncSession,
     )
 
     return list_debts.scalars().all()
+
+async def add_until_time_notification(session: AsyncSession,
+                                      student_id: int,
+                                      until_hour_notification: int,
+                                      until_minute_notification: int):
+    student = (await session.execute(
+        select(Student)
+        .where(Student.student_id == student_id)
+    )).scalar()
+
+    student.until_hour_notification = until_hour_notification
+    student.until_minute_notification = until_minute_notification
+    await session.commit()
+

@@ -14,7 +14,7 @@ class Debtor(Base):
     debtor_id: Mapped[UUID] = mapped_column(Uuid, primary_key=True, server_default=text("gen_random_uuid()"))
     teacher_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('teachers.teacher_id', ondelete='cascade'))
     student_id: Mapped[int] = mapped_column(BigInteger, ForeignKey('students.student_id', ondelete='cascade'))
-    week_date: Mapped[date] = mapped_column(Date, server_default=func.now())
+    week_date: Mapped[date] = mapped_column(Date)
     lesson_on: Mapped[time] = mapped_column(Time)
     lesson_off: Mapped[time] = mapped_column(Time)
     amount_money: Mapped[int] = mapped_column(Integer)

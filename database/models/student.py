@@ -29,8 +29,8 @@ class Student(Base):
                                             ForeignKey('teachers.teacher_id',
                                                        ondelete='cascade'))
     price: Mapped[int] = mapped_column(Integer)
-    until_hour_notification: Mapped[int] = mapped_column(Integer)
-    until_minute_notification: Mapped[int] = mapped_column(Integer)
+    until_hour_notification: Mapped[int] = mapped_column(Integer, nullable=True)
+    until_minute_notification: Mapped[int] = mapped_column(Integer, nullable=True)
 
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True),

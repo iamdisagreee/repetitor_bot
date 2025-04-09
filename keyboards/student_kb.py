@@ -6,9 +6,11 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
     StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory, InformationLessonCallbackFactory, \
-    RemoveDayOfScheduleCallbackFactory
+    RemoveDayOfScheduleCallbackFactory, ShowNextSevenDaysStudentCallbackFactory, ScheduleEditStudentCallbackFactory
+from callback_factory.taskiq_factories import InformationLessonWithDeleteCallbackFactory
 from callback_factory.teacher_factories import SentMessagePaymentStudentCallbackFactory, \
-    ScheduleShowTeacherCallbackFactory, ShowInfoDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory
+    ScheduleShowTeacherCallbackFactory, ShowInfoDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, \
+    SentMessagePaymentStudentDebtorCallbackFactory
 from lexicon.lexicon_student import LEXICON_STUDENT
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from services.services import NUMERIC_DATE
@@ -65,10 +67,12 @@ def create_back_to_entrance_kb():
 def create_authorization_kb():
     authorization_kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=LEXICON_STUDENT['show_schedule'],
-                                  callback_data='show_schedule')],
-            [InlineKeyboardButton(text=LEXICON_STUDENT['settings_schedule'],
-                                  callback_data='settings_schedule')],
+            [InlineKeyboardButton(text=LEXICON_STUDENT['lessons_student'],
+                                  callback_data='lessons_student')],
+            # [InlineKeyboardButton(text=LEXICON_STUDENT['show_schedule'],
+            #                       callback_data='show_schedule')],
+            # [InlineKeyboardButton(text=LEXICON_STUDENT['settings_schedule'],
+            #                       callback_data='settings_schedule')],
             [InlineKeyboardButton(text=LEXICON_STUDENT['penalties'],
                                   callback_data='penalties')],
             [InlineKeyboardButton(text=LEXICON_STUDENT['debts'],
@@ -79,8 +83,53 @@ def create_authorization_kb():
                                   callback_data='student_entrance')]
         ],
     )
-
     return authorization_kb
+
+
+def show_next_seven_days_student_kb(days):
+    buttons = [
+                  [InlineKeyboardButton(text=LEXICON_STUDENT['next_seven_days_kb']
+                                        .format(cur_date.strftime("%d.%m"),
+                                                NUMERIC_DATE[date(year=cur_date.year,
+                                                                  month=cur_date.month,
+                                                                  day=cur_date.day).isoweekday()]),
+                                        callback_data=ShowNextSevenDaysStudentCallbackFactory(
+                                            week_date=str(cur_date)
+                                        ).pack()
+                                        )
+                   ]
+                  for cur_date in days
+              ] + [[InlineKeyboardButton(text=LEXICON_STUDENT['back'],
+                                         callback_data='auth_student')]]
+    next_seven_days_with_cur_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
+
+    return next_seven_days_with_cur_kb
+
+
+def create_config_student_kb(week_date: str):
+    config_student_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_STUDENT['show_schedule'],
+                                  callback_data=ShowDaysOfScheduleCallbackFactory(
+                                      week_date=week_date
+                                  ).pack()
+                                  )
+             ],
+            [InlineKeyboardButton(text=LEXICON_STUDENT['settings_schedule'],
+                                  callback_data=ScheduleEditStudentCallbackFactory(
+                                      week_date=week_date
+                                  ).pack()
+                                  )
+             ],
+            [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
+                                   callback_data='lessons_student'
+                                  ),
+            InlineKeyboardButton(text=LEXICON_TEACHER['home'],
+                                  callback_data='auth_student')
+            ]
+        ]
+    )
+    return config_student_kb
 
 
 def show_next_seven_days_settings_kb(*days):
@@ -100,7 +149,7 @@ def show_next_seven_days_settings_kb(*days):
     return next_seven_days_with_cur_kb
 
 
-def create_menu_add_remove_kb():
+def create_menu_add_remove_kb(week_date):
     add_remove_gap_kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=LEXICON_STUDENT['add_gap_student'],
@@ -108,7 +157,11 @@ def create_menu_add_remove_kb():
             [InlineKeyboardButton(text=LEXICON_STUDENT['remove_gap_student'],
                                   callback_data='remove_gap_student')],
             [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
-                                  callback_data='settings_schedule')]
+                                  callback_data=ShowNextSevenDaysStudentCallbackFactory(
+                                      week_date=week_date
+                                  ).pack()
+                                  )
+             ]
         ]
     )
 
@@ -148,7 +201,10 @@ def create_choose_time_student_kb(dict_lessons,
     builder.button(text=LEXICON_STUDENT['move_right'],
                    callback_data='move_right_add')
     builder.button(text=LEXICON_STUDENT['exit'],
-                   callback_data=week_date_str)
+                   callback_data=ScheduleEditStudentCallbackFactory(
+                       week_date=week_date_str
+                   ).pack()
+                   )
 
     builder.adjust(2, 2, 2, 2, 1)
 
@@ -184,7 +240,10 @@ def create_delete_lessons_menu(dict_for_6_lessons,
     builder.button(text='>>',
                    callback_data='move_right_remove')
     builder.button(text='выйти',
-                   callback_data=week_date_str)
+                   callback_data=ScheduleEditStudentCallbackFactory(
+                       week_date=week_date_str
+                   ).pack()
+                   )
 
     builder.adjust(2, 2, 2, 2, 1)
     return builder.as_markup()
@@ -211,7 +270,7 @@ def show_next_seven_days_schedule_kb(*days):
     return next_seven_days_with_cur_kb
 
 
-def all_lessons_for_day_kb(lessons):
+def all_lessons_for_day_kb(lessons, week_date):
     builder = InlineKeyboardBuilder()
     buttons = []
     for lesson in lessons:
@@ -228,7 +287,10 @@ def all_lessons_for_day_kb(lessons):
             )
         )
     buttons.append(InlineKeyboardButton(text=LEXICON_STUDENT['back'],
-                                        callback_data='show_schedule')
+                                        callback_data=ShowNextSevenDaysStudentCallbackFactory(
+                                            week_date=str(week_date)
+                                        ).pack()
+                                        )
                    )
 
     builder.row(*buttons, width=1)
@@ -271,6 +333,7 @@ def create_button_for_back_to_all_lessons_day(week_date_str,
 
     return button_for_back_to_all_lessons_day
 
+
 def create_ok_remove_day_schedule_student_kb(week_date):
     ok_remove_day_schedule_student_kb = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -286,11 +349,14 @@ def create_ok_remove_day_schedule_student_kb(week_date):
     )
     return ok_remove_day_schedule_student_kb
 
+
 def create_settings_profile_kb():
     settings_profile_kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=LEXICON_STUDENT['information_student'],
                                   callback_data='my_profile_student')],
+            [InlineKeyboardButton(text=LEXICON_STUDENT['notifications_student'],
+                                  callback_data='notifications_student')],
             [InlineKeyboardButton(text=LEXICON_STUDENT['registration_again'],
                                   callback_data='edit_profile')],
             [InlineKeyboardButton(text=LEXICON_STUDENT['delete_profile'],
@@ -302,7 +368,26 @@ def create_settings_profile_kb():
 
     return settings_profile_kb
 
+def show_variants_edit_notifications_student_kb():
+    variants_edit_notifications_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_TEACHER['until_time_notification_button'],
+                                  callback_data='set_until_time_notification')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
+                                  callback_data='settings_student')]
+        ]
+    )
+    return variants_edit_notifications_kb
 
+
+def create_congratulations_edit_notifications_student_kb():
+    notification_confirmation_student_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
+                                  callback_data='notifications_student')]
+        ]
+    )
+    return notification_confirmation_student_kb
 def create_back_to_settings_student_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
@@ -344,21 +429,39 @@ def create_confirm_payment_teacher_kb(student_id: int,
 
     return confirm_payment_teacher_kb
 
-def create_debts_student_kb(list_debts):
-    debts_student_kb = InlineKeyboardMarkup(
+def create_confirm_payment_teacher_by_debtor_kb(student_id: int,
+                                      callback_data: InformationLessonWithDeleteCallbackFactory):
+    print('Попал в клавиатуру')
+    confirm_payment_teacher_kb = InlineKeyboardMarkup(
         inline_keyboard=[
-            [InlineKeyboardButton(text=LEXICON_STUDENT['debt_information']
-                                  .format(debt.week_date.strftime("%m.%d"),
-                                          debt.lesson_on.strftime("%H:%M"),
-                                          debt.lesson_off.strftime("%H:%M"),
-                                          debt.amount_money),
-                                  callback_data='debt_information')]
-            for debt in list_debts
-        ] + [
-            [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
-                                  callback_data='auth_student')]
+            [InlineKeyboardButton(
+                text=LEXICON_STUDENT['confirm_payment_student'],
+                callback_data=SentMessagePaymentStudentDebtorCallbackFactory(
+                    student_id=student_id,
+                    week_date=callback_data.week_date,
+                    lesson_on=callback_data.lesson_on,
+                    lesson_off=callback_data.lesson_off
+                ).pack()
+            )]
         ]
     )
 
-    return debts_student_kb
+    return confirm_payment_teacher_kb
 
+def create_debts_student_kb(list_debts):
+    debts_student_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+                            [InlineKeyboardButton(text=LEXICON_STUDENT['debt_information']
+                                                  .format(debt.week_date.strftime("%m.%d"),
+                                                          debt.lesson_on.strftime("%H:%M"),
+                                                          debt.lesson_off.strftime("%H:%M"),
+                                                          debt.amount_money),
+                                                  callback_data='debt_information')]
+                            for debt in list_debts
+                        ] + [
+                            [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
+                                                  callback_data='auth_student')]
+                        ]
+    )
+
+    return debts_student_kb

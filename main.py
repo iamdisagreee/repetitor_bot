@@ -17,7 +17,7 @@ from database import AccessStudent, Debtor
 from aiogram.fsm.storage.redis import RedisStorage
 
 from database.base import Base
-from database.teacher_requests import delete_teacher_profile
+from database.teacher_requests import delete_teacher_profile, remove_debtor_from_list_by_info
 from handlers import teacher_handlers, everyone_handlers, student_handlers, other_handlers
 from keyboards.everyone_kb import set_new_menu
 from middlewares.outer import DbSessionMiddleware
@@ -63,7 +63,6 @@ async def main():
     #      await connection.run_sync(Base.metadata.create_all)
     #      print("Создал")
 
-
     # Создаем хранилище redis для FSM
     storage = RedisStorage.from_url(config.tgbot.redis)
     # Устанавливаем вываливающуюся клавиатуру
@@ -71,6 +70,11 @@ async def main():
 
     session_maker = async_sessionmaker(engine)
     # async with session_maker() as session:
+    #     await remove_debtor_from_list_by_info(session,
+    #                                           student_id=859717714,
+    #                                           week_date=date.today(),
+    #                                           lesson_on=time(0, 8),
+    #                                           lesson_off=time(1, 8))
     #     debtor = Debtor(teacher_id=7880267101,
     #                     student_id=859717714,
     #                     week_date=date(2025, 4, 2),
@@ -89,7 +93,7 @@ async def main():
 
     await worker.startup()
     await scheduler_storage.startup()
-    await delete_all_schedules_teacher(7880267101)
+    # await delete_all_schedules_teacher(7880267101)
     # await create_scheduled_task_handler(task_name='student_mailing_lessons',
     #                                     schedule_id='student_mailing_lessons',
     #                                     cron='*/5 * * * *')

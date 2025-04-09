@@ -15,11 +15,12 @@ import time as t
 
 from broker import scheduler_storage
 from callback_factory.student_factories import ChangeStatusOfAddListCallbackFactory, DeleteStudentToStudyCallbackFactory
+from callback_factory.taskiq_factories import InformationLessonWithDeleteCallbackFactory
 from callback_factory.teacher_factories import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
     DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory, PlugScheduleLessonWeekDayBackFactory, \
     SentMessagePaymentStudentCallbackFactory, DebtorInformationCallbackFactory, RemoveDebtorFromListCallbackFactory, \
-    ShowNextSevenDaysCallbackFactory, ScheduleEditTeacherCallbackFactory
+    ShowNextSevenDaysCallbackFactory, ScheduleEditTeacherCallbackFactory, SentMessagePaymentStudentDebtorCallbackFactory
 from database import Student, LessonDay, LessonWeek, AccessStudent
 from database.models import Penalty
 # from database.taskiq_requests import give_scheduled_payment_verification_teachers
@@ -30,9 +31,9 @@ from database.teacher_requests import command_add_teacher, command_add_lesson_we
     delete_student_id_in_database, give_all_students_by_teacher_penalties, delete_all_lessons_student, \
     give_status_entry_student, give_student_by_teacher_id, \
     give_teacher_profile_by_teacher_id, delete_all_penalties_student, add_penalty_to_student, delete_penalty_of_student, \
-    give_status_pay_student, give_student_by_student_id, give_list_debtors, remove_debtor_from_list, \
+    give_status_pay_student, give_student_by_student_id, give_list_debtors, remove_debtor_from_list_by_id, \
     give_student_by_teacher_id_debtors, update_until_time_notification_teacher, update_daily_schedule_mailing_teacher, \
-    update_daily_report_mailing_teacher, update_days_cancellation_teacher
+    update_daily_report_mailing_teacher, update_days_cancellation_teacher, remove_debtor_from_list_by_info
 from filters.teacher_filters import IsTeacherInDatabase, \
     FindNextSevenDaysFromKeyboard, IsCorrectFormatTime, IsEndBiggerStart, IsDifferenceLessThirtyMinutes, \
     IsConflictWithStart, IsConflictWithEnd, IsLessonWeekInDatabase, \
@@ -510,15 +511,18 @@ async def process_not_show_status_student(callback: CallbackQuery):
 
 
 ####################### Кнопка __ПОДТВЕРДИТЬ__ при запросе о подтверждении ############################
+# Получили сообщение с просьбой подтвердить оплату, учеником НЕ в должниках
 @router.callback_query(SentMessagePaymentStudentCallbackFactory.filter())
 async def process_change_status_payment_message(callback: CallbackQuery, session: AsyncSession,
                                                 callback_data: SentMessagePaymentStudentCallbackFactory,
                                                 bot: Bot
                                                 ):
+
     week_date = give_date_format_fsm(callback_data.week_date)
     lesson_on = give_time_format_fsm(callback_data.lesson_on)
     lesson_off = give_time_format_fsm(callback_data.lesson_off)
 
+    #Меняем статус оплаты ученика
     await change_status_pay_student(session,
                                     callback_data.student_id,
                                     week_date,
@@ -530,6 +534,39 @@ async def process_change_status_payment_message(callback: CallbackQuery, session
     #Отправляем сообщение в чат ученику
     await bot.send_message(chat_id=callback_data.student_id,
                            text=LEXICON_TEACHER['success_lesson_paid']
+                           .format(week_date.strftime("%d.%m"),
+                                   NUMERIC_DATE[date(year=week_date.year,
+                                                     month=week_date.month,
+                                                     day=week_date.day).isoweekday()],
+                                   callback_data.lesson_on,
+                                   callback_data.lesson_off
+                                   ),
+                           reply_markup=create_notification_confirmation_student_kb()
+                           )
+
+# Получили сообщение с просьбой подтвердить оплату, учеником В должниках
+@router.callback_query(SentMessagePaymentStudentDebtorCallbackFactory.filter())
+async def process_change_status_payment_message(callback: CallbackQuery, session: AsyncSession,
+                                                callback_data: SentMessagePaymentStudentDebtorCallbackFactory,
+                                                bot: Bot
+                                                ):
+    print('ЗАШЕЛ СЮДА')
+    week_date = give_date_format_fsm(callback_data.week_date)
+    lesson_on = give_time_format_fsm(callback_data.lesson_on)
+    lesson_off = give_time_format_fsm(callback_data.lesson_off)
+
+    # Удаляем ученика из должников
+    await remove_debtor_from_list_by_info(session,
+                                        int(callback_data.student_id),
+                                        week_date,
+                                        lesson_on,
+                                        lesson_off)
+    #Удаляем сообщение преподавателя
+    await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
+
+    #Отправляем сообщение в чат ученику
+    await bot.send_message(chat_id=callback_data.student_id,
+                           text=LEXICON_TEACHER['success_remove_from_debts']
                            .format(week_date.strftime("%d.%m"),
                                    NUMERIC_DATE[date(year=week_date.year,
                                                      month=week_date.month,
@@ -944,8 +981,8 @@ async def process_show_full_debtor_information(callback: CallbackQuery, session:
                                                        week_date, lesson_on)
     # print(student)
     await callback.answer(text=LEXICON_TEACHER['full_information_debtor']
-                          .format(student.student_name, #Vova
-                                  student.student_surname, #Kharitonov
+                          .format(student.name, #Vova
+                                  student.surname, #Kharitonov
                                   week_date.strftime("%d.%m"),
                                   lesson_on.strftime("%H:%M"),
                                   lesson_off.strftime("%H:%M"),
@@ -970,7 +1007,7 @@ async def process_change_list_debtors(callback: CallbackQuery, session: AsyncSes
 async def process_remove_debtor(callback: CallbackQuery, session: AsyncSession,
                                 callback_data: RemoveDebtorFromListCallbackFactory):
     # Удаляем должника
-    await remove_debtor_from_list(session, uuid.UUID(callback_data.debtor_id))
+    await remove_debtor_from_list_by_id(session, uuid.UUID(callback_data.debtor_id))
     # Отображаем обновленный список должников
     list_debtors = await give_list_debtors(session, callback.from_user.id)
     await callback.message.edit_text(text=LEXICON_TEACHER['change_list_debtors'],

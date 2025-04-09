@@ -1,6 +1,6 @@
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
-
-from callback_factory.taskiq_factories import InformationLessonWithDeleteCallbackFactory
+from callback_factory.taskiq_factories import InformationLessonWithDeleteCallbackFactory, \
+    InformationLessonWithDeleteDebtCallbackFactory
 from lexicon.lexicon_taskiq import LEXICON_TASKIQ
 
 def create_confirmation_day_teacher_kb():
@@ -33,6 +33,7 @@ def create_confirmation_pay_student_kb(week_date: str,
         ]
     )
     return confirmation_pay_student_kb
+
 
 def create_notice_lesson_certain_time_student_ok():
     return InlineKeyboardMarkup(

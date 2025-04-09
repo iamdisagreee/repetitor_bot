@@ -65,6 +65,12 @@ class SentMessagePaymentStudentCallbackFactory(CallbackData, prefix='sent',  sep
     lesson_on: str
     lesson_off: str
 
+class SentMessagePaymentStudentDebtorCallbackFactory(CallbackData, prefix='sent_debtor',  sep=';'):
+    student_id: int
+    week_date: str
+    lesson_on: str
+    lesson_off: str
+
 class DebtorInformationCallbackFactory(CallbackData, prefix='debtor', sep=';'):
     lesson_on: str
     lesson_off: str

@@ -104,8 +104,8 @@ def create_schedule_like_text(result_schedule):
     text = ''
     for lesson in result_schedule:
         status = '✅' if lesson['status_pay'] else '❌'
-        text += f" - {status} {lesson['student_name']} {lesson['lesson_on'].strftime('%H:%M')}-" \
-                f"{lesson['lesson_off'].strftime('%H:%M')} {lesson['amount_money']} р. " \
+        text += f"{status} <b>{lesson['student_name']} | {lesson['lesson_on'].strftime('%H:%M')}-" \
+                f"{lesson['lesson_off'].strftime('%H:%M')} | {int(lesson['amount_money'])} ₽</b> " \
                 f"\n"
 
     return text
