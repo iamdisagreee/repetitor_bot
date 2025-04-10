@@ -1,7 +1,7 @@
 from aiogram import Router
 from aiogram.types import Message
 
-from lexicon.lexicon_all import LEXICON_ALL
+from lexicon.lexicon_everyone import LEXICON_ALL
 
 router = Router()
 

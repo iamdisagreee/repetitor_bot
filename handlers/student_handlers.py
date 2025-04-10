@@ -37,7 +37,7 @@ from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, 
     create_ok_remove_day_schedule_student_kb, create_debts_student_kb, show_next_seven_days_student_kb, \
     create_config_student_kb, show_variants_edit_notifications_student_kb, \
     create_congratulations_edit_notifications_student_kb, create_confirm_payment_teacher_by_debtor_kb
-from lexicon.lexicon_all import LEXICON_ALL
+from lexicon.lexicon_everyone import LEXICON_ALL
 from lexicon.lexicon_student import LEXICON_STUDENT
 from services.services import give_list_with_days, create_choose_time_student, give_date_format_fsm, \
     give_time_format_fsm, create_delete_time_student, show_all_lessons_for_day, \

@@ -6,8 +6,8 @@ from aiogram.fsm.state import StatesGroup, State, default_state
 from sqlalchemy.ext.asyncio import async_sessionmaker, AsyncSession
 
 from database.taskiq_requests import give_information_for_day
-from keyboards.everyone_kb import create_start_kb
-from lexicon.lexicon_all import LEXICON_ALL
+from keyboards.everyone_kb import create_start_kb, create_give_id_kb
+from lexicon.lexicon_everyone import LEXICON_ALL
 
 router = Router()
 
@@ -37,3 +37,16 @@ async def process_help_student(message: Message):
 @router.message(Command('help_teacher'))
 async def process_help_student(message: Message):
     await message.answer(LEXICON_ALL['help_teacher'])
+
+@router.message(Command('give_id'))
+async def process_give_id(message: Message):
+    await message.answer(LEXICON_ALL['give_id'].
+                         format(message.from_user.id),
+                         reply_markup=create_give_id_kb())
+
+# Нажали на __ОК__ и удаляем сообщение с id
+@router.callback_query(F.data == 'remove_my_id')
+async def process_remove_id(callback: CallbackQuery, bot: Bot):
+    await callback.answer()
+    await bot.delete_message(chat_id=callback.message.chat.id,
+                             message_id=callback.message.message_id)

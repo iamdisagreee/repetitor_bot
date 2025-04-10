@@ -8,7 +8,7 @@ from taskiq import ScheduledTask
 
 from broker import scheduler_storage
 from database import Student
-from lexicon.lexicon_all import LEXICON_ALL
+from lexicon.lexicon_everyone import LEXICON_ALL
 from lexicon.lexicon_student import LEXICON_STUDENT
 
 NUMBER_FINES = 3

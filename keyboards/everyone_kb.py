@@ -3,7 +3,7 @@ from datetime import date
 from aiogram import Bot
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, BotCommand
 
-from lexicon.lexicon_all import LEXICON_MENU
+from lexicon.lexicon_everyone import LEXICON_MENU, LEXICON_ALL
 
 
 # Устанавливаем вываливающееся меню
@@ -28,3 +28,11 @@ def create_start_kb():
     start_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
 
     return start_kb
+
+def create_give_id_kb():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_ALL['ok'],
+                                  callback_data='remove_my_id'),]
+        ]
+    )

@@ -20,7 +20,6 @@ async def give_available_ids(scheduler_storage):
 
 
 # Собираем информацию для учителя за день (заработок, еще выплатят, отработано)
-
 def give_data_config_teacher(teacher: Teacher):
     result_debtors = []
     dict_debtors = {}

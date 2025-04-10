@@ -160,7 +160,9 @@ def create_menu_add_remove_kb(week_date):
                                   callback_data=ShowNextSevenDaysStudentCallbackFactory(
                                       week_date=week_date
                                   ).pack()
-                                  )
+                                  ),
+             InlineKeyboardButton(text=LEXICON_TEACHER['home'],
+                                  callback_data='auth_student')
              ]
         ]
     )
@@ -200,7 +202,7 @@ def create_choose_time_student_kb(dict_lessons,
                    callback_data='move_left_add')
     builder.button(text=LEXICON_STUDENT['move_right'],
                    callback_data='move_right_add')
-    builder.button(text=LEXICON_STUDENT['exit'],
+    builder.button(text=LEXICON_STUDENT['back'],
                    callback_data=ScheduleEditStudentCallbackFactory(
                        week_date=week_date_str
                    ).pack()
@@ -235,17 +237,17 @@ def create_delete_lessons_menu(dict_for_6_lessons,
         )
         counter_buttons += 1
 
-    builder.button(text='<<',
+    builder.button(text=LEXICON_STUDENT['move_left'],
                    callback_data='move_left_remove')
-    builder.button(text='>>',
+    builder.button(text=LEXICON_STUDENT['move_right'],
                    callback_data='move_right_remove')
-    builder.button(text='выйти',
+    builder.button(text=LEXICON_STUDENT['back'],
                    callback_data=ScheduleEditStudentCallbackFactory(
                        week_date=week_date_str
                    ).pack()
                    )
 
-    builder.adjust(2, 2, 2, 2, 1)
+    builder.adjust(2, 2, 2, 2, 2)
     return builder.as_markup()
 
 
@@ -290,10 +292,14 @@ def all_lessons_for_day_kb(lessons, week_date):
                                         callback_data=ShowNextSevenDaysStudentCallbackFactory(
                                             week_date=str(week_date)
                                         ).pack()
-                                        )
+                                        ),
                    )
+    buttons.append(InlineKeyboardButton(text=LEXICON_TEACHER['home'],
+                    callback_data='auth_student'))
 
-    builder.row(*buttons, width=1)
+    builder.row(*buttons[:-2], width=1)
+    builder.row(*buttons[-2:], width=2)
+
     return builder.as_markup()
 
 
@@ -327,6 +333,9 @@ def create_button_for_back_to_all_lessons_day(week_date_str,
                                       week_date=week_date_str
                                   ).pack()
                                   )
+             ,
+             InlineKeyboardButton(text=LEXICON_TEACHER['home'],
+                                  callback_data='auth_student')
              ]
         ]
     )
@@ -374,7 +383,10 @@ def show_variants_edit_notifications_student_kb():
             [InlineKeyboardButton(text=LEXICON_TEACHER['until_time_notification_button'],
                                   callback_data='set_until_time_notification')],
             [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
-                                  callback_data='settings_student')]
+                                  callback_data='settings_student'),
+             InlineKeyboardButton(text=LEXICON_TEACHER['home'],
+                                  callback_data='auth_student')
+             ]
         ]
     )
     return variants_edit_notifications_kb
@@ -391,7 +403,10 @@ def create_congratulations_edit_notifications_student_kb():
 def create_back_to_settings_student_kb():
     return InlineKeyboardMarkup(inline_keyboard=[
         [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
-                              callback_data='settings_student')]
+                              callback_data='settings_student'),
+         InlineKeyboardButton(text=LEXICON_TEACHER['home'],
+                              callback_data='auth_student')
+         ]
     ])
 
 

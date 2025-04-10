@@ -59,3 +59,4 @@ from services.services_taskiq import check_is_30_minutes_between, give_correct_t
 
 # dt_lesson = datetime(year=week_date.year, month=, day=,
 #                      hour=lesson_start.hour, minute=lesson_start.minute)
+a = [[]]

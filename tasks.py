@@ -46,8 +46,8 @@ async def daily_newsletter_teacher(teacher_id: int,
     await bot.send_message(chat_id=teacher_id,
                            text=LEXICON_TASKIQ['info_non_payment_teacher']
                            .format(datetime.now().strftime("%d.%m"), give_week_day_by_week_date(date.today()),
-                                   f"{general_information['amount_time'] // 3600} ч."
-                                   f" {general_information['amount_time'] // 60 % 60} мин.",
+                                   f"{general_information['amount_time'] // 60} ч."
+                                   f" {general_information['amount_time']  % 60} мин.",
                                    int(general_information['amount_money_yes']),
                                    int(general_information['amount_money_no']),
                                    text),

@@ -55,7 +55,7 @@ from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb,
     create_notification_confirmation_student_kb, create_list_debtors_kb, change_list_debtors_kb, \
     show_variants_edit_notifications_kb, create_congratulations_edit_notifications_kb, create_lessons_week_teacher_kb, \
     create_config_teacher_kb
-from lexicon.lexicon_all import LEXICON_ALL
+from lexicon.lexicon_everyone import LEXICON_ALL
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from main import worker
 from services.services import give_list_with_days, give_time_format_fsm, give_date_format_fsm, \
@@ -550,7 +550,7 @@ async def process_change_status_payment_message(callback: CallbackQuery, session
                                                 callback_data: SentMessagePaymentStudentDebtorCallbackFactory,
                                                 bot: Bot
                                                 ):
-    print('ЗАШЕЛ СЮДА')
+
     week_date = give_date_format_fsm(callback_data.week_date)
     lesson_on = give_time_format_fsm(callback_data.lesson_on)
     lesson_off = give_time_format_fsm(callback_data.lesson_off)
@@ -576,7 +576,7 @@ async def process_change_status_payment_message(callback: CallbackQuery, session
                                    ),
                            reply_markup=create_notification_confirmation_student_kb()
                            )
-
+    await callback.answer(LEXICON_TEACHER['remove_from_debtors'])
 ########################################## кнопка МОЕ РАСПИСАНИЕ ######################################
 # @router.callback_query(F.data == 'schedule_show')
 # async def process_show_my_schedule(callback: CallbackQuery):
