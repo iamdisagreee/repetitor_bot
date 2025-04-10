@@ -19,16 +19,19 @@ class DbSessionMiddleware(BaseMiddleware):
                        handler: Callable[[TelegramObject, Dict[str, Any]], Awaitable[Any]],
                        event: TelegramObject,
                        data: Dict[str, Any]):
-
         async with self.session_pool() as session:
-            available_teachers = await session.execute(select(AccessTeacher.teacher_id)
-                                                       .where(AccessTeacher.status == True))
-            available_students = await session.execute(select(AccessStudent.student_id)
-                                                       .where(AccessStudent.status == True))
-            data["available_teachers"] = [teacher for teacher
-                                          in available_teachers.scalars()]
-            data["available_students"] = [student for student in
-                                          available_students.scalars()]
+            available_teachers = set(
+                (await session.execute(select(AccessTeacher.teacher_id)
+                                       .where(AccessTeacher.status == True))
+                 ).scalars().all()
+            )
+            available_students = set(
+                (await session.execute(select(AccessStudent.student_id)
+                                       .where(AccessStudent.status == True)
+                                       )
+                 ).scalars().all()
+            )
+            data["available_teachers"] = available_teachers
+            data["available_students"] = available_students
             data["session"] = session
             return await handler(event, data)
-

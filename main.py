@@ -33,22 +33,6 @@ bot = Bot(token=config.tgbot.token,
           default=DefaultBotProperties(parse_mode=ParseMode.HTML))
 dp = Dispatcher()
 
-@worker.on_event(TaskiqEvents.WORKER_STARTUP)
-async def startup(state: TaskiqState) -> None:
-    config = load_config()
-    engine = create_async_engine(url=config.tgbot.postgresql,
-                                 echo=False)
-    state.session_pool = async_sessionmaker(engine)
-
-
-@worker.task
-async def daily_payment_check(context: Context = TaskiqDepends(),
-                              bot: Bot = TaskiqDepends(),
-                              ):
-    async with context.state.session_pool() as session:
-        res = await session.execute(select(AccessStudent.student_id))
-    await bot.send_message(859717714, str(res.scalar()))
-
 
 async def main():
     config = load_config()

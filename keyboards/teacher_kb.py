@@ -48,12 +48,6 @@ def create_authorization_kb():
         inline_keyboard=[
             [InlineKeyboardButton(text=LEXICON_TEACHER['lessons_week_teacher'],
                                   callback_data='lessons_week_teacher')],
-            # [InlineKeyboardButton(text=LEXICON_TEACHER['schedule_show'],
-            #                       callback_data='schedule_show')],
-            # [InlineKeyboardButton(text=LEXICON_TEACHER['schedule_teacher'],
-            #                       callback_data='schedule_teacher')],
-            # [InlineKeyboardButton(text=LEXICON_TEACHER['confirmation_pay'],
-            #                       callback_data='confirmation_pay')],
             [InlineKeyboardButton(text=LEXICON_TEACHER['management_students'],
                                   callback_data='management_students')],
             [InlineKeyboardButton(text=LEXICON_TEACHER['settings_teacher'],
@@ -126,30 +120,6 @@ def create_config_teacher_kb(week_date: str):
 
     return config_teacher_kb
 
-
-# Отображаем клавиатуру на следующие 7 дней + сегодняшний день
-def show_next_seven_days_kb(days):
-    buttons = [
-                  [InlineKeyboardButton(text=LEXICON_TEACHER['next_seven_days_kb']
-                                        .format(cur_date.strftime("%d.%m"),
-                                                NUMERIC_DATE[
-                                                    date(
-                                                        year=cur_date.year,
-                                                        month=cur_date.month,
-                                                        day=cur_date.day
-                                                    ).isoweekday()
-                                                ]
-                                                ),
-                                        callback_data=cur_date.strftime("%Y-%m-%d"))
-                   ]
-                  for cur_date in days
-              ] + [[InlineKeyboardButton(text=LEXICON_TEACHER['back'],
-                                         callback_data='auth_teacher')]]
-    next_seven_days_with_cur_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-
-    return next_seven_days_with_cur_kb
-
-
 # Клавиатура кнопок __ДОБАВИТЬ__ и __УДАЛИТЬ__
 def create_add_remove_gap_kb(week_date: str):
     add_remove_gap_kb = InlineKeyboardMarkup(
@@ -213,29 +183,6 @@ def create_all_records_week_day(weeks_day,
     return all_records_week_day_kb
 
 
-def show_next_seven_days_pay_kb(*days):
-    buttons = [
-                  [InlineKeyboardButton(text=LEXICON_TEACHER['next_seven_days_pay_kb'].format(
-                      cur_date.strftime("%d.%m"),
-                      NUMERIC_DATE[
-                          date(year=cur_date.year,
-                               month=cur_date.month,
-                               day=cur_date.day).isoweekday()
-                      ]
-                  ),
-                      callback_data=ShowDaysOfPayCallbackFactory(
-                          week_date=cur_date.strftime("%Y-%m-%d")
-                      ).pack()
-                  )
-                  ]
-                  for cur_date in days
-              ] + [[InlineKeyboardButton(text=LEXICON_TEACHER['back'],
-                                         callback_data='auth_teacher')]]
-
-    next_seven_days_with_cur_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-    return next_seven_days_with_cur_kb
-
-
 # Отображаем статусы занятий за день
 async def show_status_lesson_day_kb(cur_buttons,
                                     session: AsyncSession,
@@ -277,29 +224,6 @@ async def show_status_lesson_day_kb(cur_buttons,
     builder.row(*res_buttons[-2:], width=2)
 
     return builder.as_markup()
-
-
-def show_next_seven_days_schedule_teacher_kb(*days):
-    buttons = [
-                  [InlineKeyboardButton(text=LEXICON_TEACHER['next_seven_days_schedule_teacher_kb'].format(
-                      cur_date.strftime("%d.%m"),
-                      NUMERIC_DATE[
-                          date(year=cur_date.year,
-                               month=cur_date.month,
-                               day=cur_date.day).isoweekday()
-                      ]
-                  ),
-                      callback_data=ShowDaysOfScheduleTeacherCallbackFactory(
-                          week_date=cur_date.strftime("%Y-%m-%d")
-                      ).pack()
-                  )
-                  ]
-                  for cur_date in days
-              ] + [[InlineKeyboardButton(text=LEXICON_TEACHER['back'],
-                                         callback_data='auth_teacher')]]
-
-    next_seven_days_with_cur_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-    return next_seven_days_with_cur_kb
 
 
 async def show_schedule_lesson_day_kb(session: AsyncSession,

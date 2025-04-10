@@ -11,7 +11,7 @@ from sqlalchemy.orm import selectinload
 
 from callback_factory.student_factories import ShowDaysOfScheduleCallbackFactory, DeleteFieldCallbackFactory, \
     InformationLessonCallbackFactory
-from database import Student, LessonWeek, LessonDay
+from database import Student, LessonWeek, LessonDay, AccessStudent
 from database.models import Penalty
 from database.student_requests import give_lessons_week_for_day, give_all_busy_time_intervals, \
     give_teacher_by_student_id, give_all_lessons_for_day, give_all_debts_student
@@ -22,11 +22,15 @@ from services.services import give_list_with_days, give_date_format_fsm, create_
 # Преподаватель - нет доступа
 # Ученик - открываем
 class StudentStartFilter(BaseFilter):
-    async def __call__(self, callback: CallbackQuery,
-                       available_students):
+    async def __call__(self, callback: CallbackQuery, session: AsyncSession):
+        available_students =set(
+                (await session.execute(select(AccessStudent.student_id)
+                                       .where(AccessStudent.status == True)
+                                       )
+                 ).scalars().all()
+            )
+
         result = callback.from_user.id in available_students
-        # if not result:
-        #     await callback.answer()
         return result
 
 

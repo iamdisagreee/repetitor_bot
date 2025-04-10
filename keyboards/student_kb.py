@@ -69,10 +69,6 @@ def create_authorization_kb():
         inline_keyboard=[
             [InlineKeyboardButton(text=LEXICON_STUDENT['lessons_student'],
                                   callback_data='lessons_student')],
-            # [InlineKeyboardButton(text=LEXICON_STUDENT['show_schedule'],
-            #                       callback_data='show_schedule')],
-            # [InlineKeyboardButton(text=LEXICON_STUDENT['settings_schedule'],
-            #                       callback_data='settings_schedule')],
             [InlineKeyboardButton(text=LEXICON_STUDENT['penalties'],
                                   callback_data='penalties')],
             [InlineKeyboardButton(text=LEXICON_STUDENT['debts'],
@@ -130,23 +126,6 @@ def create_config_student_kb(week_date: str):
         ]
     )
     return config_student_kb
-
-
-def show_next_seven_days_settings_kb(*days):
-    buttons = [
-                  [InlineKeyboardButton(text=LEXICON_STUDENT['next_seven_days_kb']
-                                        .format(cur_date.strftime("%d.%m"),
-                                                NUMERIC_DATE[date(year=cur_date.year,
-                                                                  month=cur_date.month,
-                                                                  day=cur_date.day).isoweekday()]),
-                                        callback_data=cur_date.strftime("%Y-%m-%d"))]
-                  for cur_date in days
-              ] + [[InlineKeyboardButton(text=LEXICON_STUDENT['back'],
-                                         callback_data='auth_student')]]
-
-    next_seven_days_with_cur_kb = InlineKeyboardMarkup(inline_keyboard=buttons)
-
-    return next_seven_days_with_cur_kb
 
 
 def create_menu_add_remove_kb(week_date):

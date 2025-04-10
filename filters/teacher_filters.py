@@ -19,11 +19,13 @@ from services.services import give_list_with_days, give_date_format_callback, gi
 # Ученик - ничего не происходит
 # Преподаватель - открываем
 class TeacherStartFilter(BaseFilter):
-    async def __call__(self, callback: CallbackQuery,
-                       available_teachers):
+    async def __call__(self, callback: CallbackQuery, session: AsyncSession):
+        available_teachers = set(
+            (await session.execute(select(AccessTeacher.teacher_id)
+                                   .where(AccessTeacher.status == True))
+             ).scalars().all()
+        )
         result = callback.from_user.id in available_teachers
-        # if not result:
-        #     await callback.answer(text='Нет доступа!')
         return result
 
 

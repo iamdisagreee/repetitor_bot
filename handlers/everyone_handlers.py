@@ -14,11 +14,9 @@ router = Router()
 
 @router.message(CommandStart())
 async def process_start_using_bot(message: Message, state: FSMContext,
-                                  session: AsyncSession
                                   ):
     await message.answer(text=LEXICON_ALL['start'],
                          reply_markup=create_start_kb())
-    # await give_information_for_day(session)
     await state.clear()
 
 

@@ -1,14 +1,12 @@
-import time
-from datetime import datetime, date, timedelta
+from datetime import datetime, date
 
 from aiogram import Router, F, Bot
 from aiogram.filters import StateFilter
 
-from aiogram.fsm.state import StatesGroup, State, default_state
+from aiogram.fsm.state import default_state
 from aiogram.types import Message, CallbackQuery, ReplyKeyboardRemove
 from aiogram.fsm.context import FSMContext
 from sqlalchemy.ext.asyncio import AsyncSession
-from taskiq_nats import NATSKeyValueScheduleSource
 from sqlalchemy import select
 
 from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
@@ -20,17 +18,17 @@ from database import Student, LessonDay
 from database.student_requests import command_get_all_teachers, command_add_students, give_lessons_week_for_day, \
     add_lesson_day, give_teacher_by_student_id, give_all_busy_time_intervals, \
     give_all_lessons_for_day, remove_lesson_day, give_week_id_by_teacher_id, \
-    give_information_of_lesson, delete_student_profile, give_students_penalty, give_all_information_teacher, \
-    delete_gap_lessons_by_student, give_all_debts_student, add_until_time_notification
+    give_information_of_lesson, delete_student_profile, give_students_penalty, \
+    delete_gap_lessons_by_student, add_until_time_notification
 from filters.student_filters import IsStudentInDatabase, IsInputFieldAlpha, \
-    FindNextSevenDaysFromKeyboard, IsMoveRightAddMenu, IsMoveLeftMenu, IsTeacherDidSlots, IsStudentChooseSlots, \
+    IsMoveRightAddMenu, IsMoveLeftMenu, IsTeacherDidSlots, IsStudentChooseSlots, \
     IsMoveRightRemoveMenu, IsLessonsInChoseDay, IsTimeNotExpired, IsFreeSlots, IsTeacherDidSystemPenalties, \
     IsStudentHasPenalties, StudentStartFilter, IsRightClassCourse, IsRightPrice, \
     IsNotAlreadyConfirmed, IsUntilTimeNotification, IsDebtsStudent
 from fsm.fsm_student import FSMRegistrationStudentForm, FSMUntilTimeNotification
 from keyboards.everyone_kb import create_start_kb
 from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, create_level_choice_kb, \
-    create_back_to_entrance_kb, create_authorization_kb, show_next_seven_days_settings_kb, create_menu_add_remove_kb, \
+    create_back_to_entrance_kb, create_authorization_kb, create_menu_add_remove_kb, \
     create_choose_time_student_kb, create_delete_lessons_menu, show_next_seven_days_schedule_kb, all_lessons_for_day_kb, \
     create_button_for_back_to_all_lessons_day, create_settings_profile_kb, create_information_penalties, \
     create_back_to_settings_student_kb, create_confirm_payment_teacher_kb, \
@@ -42,9 +40,8 @@ from lexicon.lexicon_student import LEXICON_STUDENT
 from services.services import give_list_with_days, create_choose_time_student, give_date_format_fsm, \
     give_time_format_fsm, create_delete_time_student, show_all_lessons_for_day, \
     give_text_information_lesson, course_class_choose, COUNT_BAN, give_result_status_timeinterval, NUMERIC_DATE, \
-    create_list_gaps_by_time_on_and_off, is_correct_sent_delete_lesson_for_teacher, give_week_day_by_week_date
+    is_correct_sent_delete_lesson_for_teacher, give_week_day_by_week_date
 from services.services_taskiq import delete_all_schedules_student
-from tasks import notice_lesson_certain_time_student
 
 # Преподаватель - нет доступа
 # Ученик - открываем
@@ -56,7 +53,6 @@ router.callback_query.filter(StudentStartFilter())
 
 @router.callback_query(F.data == 'student_entrance')
 async def process_entrance(callback: CallbackQuery):
-    # await notice_lesson_certain_time_student.kiq(callback.from_user.id)
     await callback.message.edit_text(text=LEXICON_STUDENT['menu_identification'],
                                      reply_markup=create_entrance_kb())
 
@@ -165,11 +161,12 @@ async def process_price_sent(message: Message, state: FSMContext, session: Async
     await state.update_data(price=message.text)
     student_form = await state.get_data()
     await command_add_students(session,
-                                message.from_user.id,
-                                **student_form)
+                               message.from_user.id,
+                               **student_form)
     await state.clear()
     await message.answer(text=LEXICON_STUDENT['access_registration_profile'],
                          reply_markup=create_back_to_entrance_kb())
+
 
 ###Неправильные фильтры для анкеты
 # Имя неправильного формата!
@@ -222,6 +219,7 @@ async def process_subject_sent(message: Message):
 async def process_price_sent(message: Message):
     await message.answer(LEXICON_STUDENT['not_fill_price'])
 
+
 # Случай, когда ученик находится в бд, но хочет зарегистрироваться
 @router.callback_query(F.data == 'reg_student', IsStudentInDatabase())
 async def process_not_start_registration(callback: CallbackQuery):
@@ -240,6 +238,7 @@ async def process_start_authorization(callback: CallbackQuery):
     await callback.message.edit_text(text=LEXICON_STUDENT['main_menu_authorization'],
                                      reply_markup=create_authorization_kb())
 
+
 ########################################################################################
 ################################### УРОКИ ##############################################
 ########################################################################################
@@ -251,19 +250,10 @@ async def process_show_lessons_week(callback: CallbackQuery):
 
 
 # ###################### Логика настройки расписания (добавление/удаление) #########
-# @router.callback_query(F.data == 'settings_schedule')
-# async def process_settings_schedule(callback: CallbackQuery, state: FSMContext):
-#     next_seven_days_with_cur = give_list_with_days(datetime.now())
-#
-#     await callback.message.edit_text(text=LEXICON_STUDENT['schedule_student_menu'],
-#                                      reply_markup=show_next_seven_days_settings_kb(*next_seven_days_with_cur))
-#     await state.clear()
-
-#Поймали конкретный день - выводим, что можно сделать с этим днем
+# Поймали конкретный день - выводим, что можно сделать с этим днем
 @router.callback_query(ShowNextSevenDaysStudentCallbackFactory.filter())
 async def process_menu_config_teacher(callback: CallbackQuery,
                                       callback_data: ShowNextSevenDaysStudentCallbackFactory):
-
     week_date = give_date_format_fsm(callback_data.week_date)
     await callback.message.edit_text(text=LEXICON_STUDENT['header_config_student']
                                      .format(week_date.strftime("%d.%m"),
@@ -271,6 +261,7 @@ async def process_menu_config_teacher(callback: CallbackQuery,
                                              ),
                                      reply_markup=create_config_student_kb(callback_data.week_date)
                                      )
+
 
 ############################ Здесь выбираем Выбрать/Удалить окошко ###################################3
 @router.callback_query(ScheduleEditStudentCallbackFactory.filter())
@@ -318,14 +309,13 @@ async def process_move_right_add_menu(callback: CallbackQuery,
                                      reply_markup=create_choose_time_student_kb(
                                          dict_lessons,
                                          week_date_str,
-                                         page+1
+                                         page + 1
                                      ))
 
 
 # Движемся влево в нашем меню занятий
 @router.callback_query(F.data == 'move_left_add', IsMoveLeftMenu())
 async def process_move_right_add_menu(callback: CallbackQuery, session: AsyncSession, state: FSMContext):
-
     state_dict = await state.get_data()
     week_date_str = state_dict['week_date']
     week_date = give_date_format_fsm(week_date_str)
@@ -417,7 +407,6 @@ async def process_touch_menu_add(callback: CallbackQuery, session: AsyncSession,
                                      ))
 
 
-
 # Нажимаем на пустую кнопку
 @router.callback_query(EmptyAddFieldCallbackFactory.filter())
 async def process_touch_empty_button(callback: CallbackQuery):
@@ -440,16 +429,15 @@ async def process_not_add_time_study(callback: CallbackQuery):
 
 @router.callback_query(F.data == 'remove_gap_student', IsStudentChooseSlots())
 async def process_remove_time_study(callback: CallbackQuery,
-                                     week_date_str: str, page: int,
-                                     all_busy_lessons: list[LessonDay]):
-
+                                    week_date_str: str, page: int,
+                                    all_busy_lessons: list[LessonDay]):
     dict_for_6_lessons = create_delete_time_student(all_busy_lessons)
     await callback.message.edit_text(text=LEXICON_STUDENT['delete_slot'],
                                      reply_markup=create_delete_lessons_menu(
-                                        dict_for_6_lessons,
-                                        week_date_str,
-                                        page)
-                                    )
+                                         dict_for_6_lessons,
+                                         week_date_str,
+                                         page)
+                                     )
 
 
 # Настраиваем удаление записей по нажатию на кнопку! + Ограничение по удалению не наступило!
@@ -508,12 +496,12 @@ async def process_move_left_remove(callback: CallbackQuery, session: AsyncSessio
                                    week_date_str: str,
                                    dict_for_6_lessons,
                                    page: int):
-    await state.update_data(page=page+1)
+    await state.update_data(page=page + 1)
 
     await callback.message.edit_text(text=LEXICON_STUDENT['delete_slot'],
                                      reply_markup=create_delete_lessons_menu(dict_for_6_lessons,
                                                                              week_date_str,
-                                                                             page+1))
+                                                                             page + 1))
 
 
 # Случай, при нажатии на кнопку __удалить__ нечего удалять
@@ -547,23 +535,12 @@ async def process_not_move_left_remove(callback: CallbackQuery):
 
 
 ########################## Кнопка __Мое расписание__ ######################################
-# Нажимаем на кнопку Мое расписание и вываливается список доступных дней
-# @router.callback_query(F.data == 'show_schedule')
-# async def process_show_schedule(callback: CallbackQuery, state: FSMContext):
-#     next_seven_days_with_cur = give_list_with_days(datetime.now())
-#
-#     await callback.message.edit_text(text=LEXICON_STUDENT['my_schedule_menu'],
-#                                      reply_markup=show_next_seven_days_schedule_kb(*next_seven_days_with_cur))
-#     await state.clear()
-
-
 # Выбираем день занятия (нажимаем на этот день)
 @router.callback_query(ShowDaysOfScheduleCallbackFactory.filter(), IsLessonsInChoseDay())
 async def process_show_lessons_for_day(callback: CallbackQuery,
                                        callback_data: ShowDaysOfScheduleCallbackFactory,
                                        state: FSMContext,
                                        all_lessons_for_day_not_ordered: list[LessonDay]):
-
     await state.update_data(week_date=callback_data.week_date)
     week_date = give_date_format_fsm(callback_data.week_date)
     all_lessons_for_day_ordered_list = show_all_lessons_for_day(all_lessons_for_day_not_ordered)
@@ -575,7 +552,8 @@ async def process_show_lessons_for_day(callback: CallbackQuery,
                                                                          week_date)
                                      )
 
-#Нечего смотреть в выбранном дне
+
+# Нечего смотреть в выбранном дне
 @router.callback_query(ShowDaysOfScheduleCallbackFactory.filter(), ~IsLessonsInChoseDay())
 async def process_not_show_lessons_for_day(callback: CallbackQuery):
     await callback.answer(LEXICON_STUDENT['not_choose_gaps'])
@@ -601,7 +579,7 @@ async def process_show_full_information_lesson(callback: CallbackQuery, session:
                                                                     lesson_on,
                                                                     lesson_off)
 
-    #Общая информация для определения статуса оплаты и общей суммы занятия
+    # Общая информация для определения статуса оплаты и общей суммы занятия
     result_status, counter_lessons = give_result_status_timeinterval(information_of_status_lesson)
 
     # Получаем информацию об уроке в зависимости от системы пенальти
@@ -621,9 +599,10 @@ async def process_show_full_information_lesson(callback: CallbackQuery, session:
                                                                                             counter_lessons)
                                      )
 
+
 ##################### Отправляем сообщение преподавателю с ожиданием подтверждения оплаты ############################
 
-#Нажали __отправить__ из меню ученика
+# Нажали __отправить__ из меню ученика
 @router.callback_query(InformationLessonCallbackFactory.filter(), IsNotAlreadyConfirmed())
 async def process_sent_student_payment_confirmation(callback: CallbackQuery, teacher_id: int, bot: Bot,
                                                     session: AsyncSession,
@@ -644,17 +623,20 @@ async def process_sent_student_payment_confirmation(callback: CallbackQuery, tea
                            )
     await callback.answer(text=LEXICON_STUDENT['student_payment_confirmation_good'])
 
-#Случай, когда оплата уже подтверждена
+
+# Случай, когда оплата уже подтверждена
 @router.callback_query(InformationLessonCallbackFactory.filter(), ~IsNotAlreadyConfirmed())
 async def process_not_sent_student_payment_confirmation(callback: CallbackQuery):
     await callback.answer(text=LEXICON_STUDENT['already_confirm_lesson'])
 
-#Получаем обратное сообщение с подтверждением (Нажали на кнопку __Ок__)
+
+# Получаем обратное сообщение с подтверждением (Нажали на кнопку __Ок__)
 @router.callback_query(F.data == 'notification_confirmation_student')
 async def process_give_repeat_message_confirmation(callback: CallbackQuery, bot: Bot):
     await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
 
-#Нажали __отправить__, так как пришло сообщение о том, что в должниках
+
+# Нажали __отправить__, так как пришло сообщение о том, что в должниках
 @router.callback_query(InformationLessonWithDeleteCallbackFactory.filter(), IsNotAlreadyConfirmed())
 async def process_sent_student_payment_confirmation(callback: CallbackQuery, teacher_id: int, bot: Bot,
                                                     session: AsyncSession,
@@ -671,7 +653,7 @@ async def process_sent_student_payment_confirmation(callback: CallbackQuery, tea
                                    callback_data.lesson_on, callback_data.lesson_off,
                                    callback_data.full_price),
                            reply_markup=create_confirm_payment_teacher_by_debtor_kb(callback.from_user.id,
-                                                                          callback_data)
+                                                                                    callback_data)
                            )
     await callback.answer(text=LEXICON_STUDENT['student_payment_confirmation_good'])
     await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
@@ -681,7 +663,6 @@ async def process_sent_student_payment_confirmation(callback: CallbackQuery, tea
 @router.callback_query(RemoveDayOfScheduleCallbackFactory.filter())
 async def process_remove_lesson_student(callback: CallbackQuery, bot: Bot, session: AsyncSession,
                                         callback_data: RemoveDayOfScheduleCallbackFactory):
-
     student = await give_teacher_by_student_id(session, callback.from_user.id)
     lesson_on_time = give_time_format_fsm(callback_data.lesson_on)
     lesson_off_time = give_time_format_fsm(callback_data.lesson_off)
@@ -692,11 +673,11 @@ async def process_remove_lesson_student(callback: CallbackQuery, bot: Bot, sessi
                                         week_date_date, lesson_on_time,
                                         lesson_off_time)
     ######### Отображаем обновленную страничку
-    all_lessons_for_day_not_ordered = ( await give_all_lessons_for_day(session,
-                                       week_date_date,
-                                       callback.from_user.id
-                                       )
-                                      ).all()
+    all_lessons_for_day_not_ordered = (await give_all_lessons_for_day(session,
+                                                                      week_date_date,
+                                                                      callback.from_user.id
+                                                                      )
+                                       ).all()
 
     #### Если это была не единственная запись на день, то на обновленную страницу со списком занятий на день
     if all_lessons_for_day_not_ordered:
@@ -704,7 +685,7 @@ async def process_remove_lesson_student(callback: CallbackQuery, bot: Bot, sessi
 
         await callback.message.edit_text(text=LEXICON_STUDENT['schedule_lesson_day']
                                          .format(week_date_date.strftime("%d.%m"),
-                                             give_week_day_by_week_date(week_date_date)),
+                                                 give_week_day_by_week_date(week_date_date)),
                                          reply_markup=all_lessons_for_day_kb(all_lessons_for_day_ordered_list,
                                                                              week_date_date)
                                          )
@@ -748,10 +729,10 @@ async def process_show_information_profile(callback: CallbackQuery, session: Asy
     course_class = course_class_choose(student.class_learning,
                                        student.course_learning)
     until_hour_notification = student.until_hour_notification if student.until_hour_notification \
-                                                                else '-'
+        else '-'
 
     until_minute_notification = student.until_minute_notification if student.until_minute_notification \
-                                                                else '-'
+        else '-'
 
     await callback.message.edit_text(text=LEXICON_STUDENT['information_about_student']
                                      .format(student.name,
@@ -764,11 +745,14 @@ async def process_show_information_profile(callback: CallbackQuery, session: Asy
                                              until_hour_notification,
                                              until_minute_notification),
                                      reply_markup=create_back_to_settings_student_kb())
+
+
 # ------------------------- Кнопка уведомления -------------------------------------------
 @router.callback_query(F.data == 'notifications_student')
 async def process_show_notifications_student(callback: CallbackQuery):
     await callback.message.edit_text(text=LEXICON_STUDENT['header_notifications'],
                                      reply_markup=show_variants_edit_notifications_student_kb())
+
 
 # Нажали на __Напоминание о занятии__
 @router.callback_query(F.data == 'set_until_time_notification')
@@ -776,6 +760,7 @@ async def process_registration_until_time(callback: CallbackQuery, state: FSMCon
     await state.set_state(FSMUntilTimeNotification.fill_until_time_notification)
     await callback.message.answer(text=LEXICON_STUDENT['fill_until_time_notification'])
     await callback.answer()
+
 
 # Ловим введенное время и вносим изменения
 @router.message(StateFilter(FSMUntilTimeNotification.fill_until_time_notification),
@@ -792,12 +777,14 @@ async def process_add_until_time_notification(message: Message, session: AsyncSe
                          reply_markup=create_congratulations_edit_notifications_student_kb()
                          )
 
+
 # Неправильное время, за которое будет приходить уведомление о занятии
 @router.message(StateFilter(FSMUntilTimeNotification.fill_until_time_notification))
 async def process_not_until_time_notification(message: Message):
     await message.answer(LEXICON_STUDENT['not_fill_until_time_notification'])
 
-#------------------------------------------------------------------------------------------
+
+# ------------------------------------------------------------------------------------------
 # Выбрали __Заполнить профиль заново__
 @router.callback_query(F.data == 'edit_profile', StateFilter(default_state))
 async def process_change_settings_profile(callback: CallbackQuery, state: FSMContext):
@@ -805,10 +792,12 @@ async def process_change_settings_profile(callback: CallbackQuery, state: FSMCon
     await state.clear()
     await state.set_state(FSMRegistrationStudentForm.fill_name)
 
-#Нажали на кнопку - ничего не происходит
+
+# Нажали на кнопку - ничего не происходит
 @router.callback_query(F.data == 'debt_information')
 async def process_nothing_debt_information(callback: CallbackQuery):
     await callback.answer()
+
 
 # Нажали удалить профиль
 @router.callback_query(F.data == 'delete_profile')
@@ -831,12 +820,15 @@ async def process_penalties(callback: CallbackQuery, session: AsyncSession):
     await callback.message.edit_text(text=LEXICON_STUDENT['penalty_menu']
                                      .format(COUNT_BAN - len(student_penalties)),
                                      reply_markup=create_information_penalties(student_penalties))
+
+
 ####################################### Кнопка Задолженности #########################################
 @router.callback_query(F.data == 'debts', IsDebtsStudent())
 async def process_debts(callback: CallbackQuery, session: AsyncSession,
                         list_debts):
     await callback.message.edit_text(text=LEXICON_STUDENT['debts_header'],
                                      reply_markup=create_debts_student_kb(list_debts))
+
 
 # Нет задолженностей
 @router.callback_query(F.data == 'debts')
@@ -854,6 +846,7 @@ async def process_not_penalties(callback: CallbackQuery):
 @router.callback_query(F.data == 'penalties', ~IsTeacherDidSystemPenalties())
 async def process_not_work_penalties(callback: CallbackQuery):
     await callback.answer(LEXICON_STUDENT['system_off'])
+
 
 #######################################################################################################
 

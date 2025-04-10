@@ -79,7 +79,8 @@ async def daily_newsletter_teacher(teacher_id: int,
                                                    give_week_day_by_week_date(date.today()),
                                                    student['lesson_on'].strftime("%H:%M"),
                                                    student['lesson_off'].strftime("%H:%M"),
-                                                   student['amount_money']
+                                                   student['amount_money'],
+                                                   teacher.phone
                                                    )
                                            ,
                                            reply_markup=create_confirmation_pay_student_kb(

@@ -1,82 +1,69 @@
-import asyncio
 import uuid
-from datetime import datetime, timedelta, date, time, timezone
+from datetime import datetime, timedelta, date, time
 
 from aiogram import Router, F, Bot
 from aiogram.filters import StateFilter
 from aiogram.fsm.context import FSMContext
 from aiogram.types import Message, CallbackQuery
-from aiogram.fsm.state import StatesGroup, State, default_state
-from sqlalchemy import delete, select
+from aiogram.fsm.state import default_state
 from sqlalchemy.ext.asyncio import AsyncSession
 from taskiq_nats import NATSKeyValueScheduleSource
-from taskiq import Context, TaskiqDepends, ScheduledTask
-import time as t
 
-from broker import scheduler_storage
 from callback_factory.student_factories import ChangeStatusOfAddListCallbackFactory, DeleteStudentToStudyCallbackFactory
-from callback_factory.taskiq_factories import InformationLessonWithDeleteCallbackFactory
 from callback_factory.teacher_factories import ShowDaysOfPayCallbackFactory, EditStatusPayCallbackFactory, \
     DeleteDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, ShowInfoDayCallbackFactory, \
-    DeleteDayScheduleCallbackFactory, PlugPenaltyTeacherCallbackFactory, PlugScheduleLessonWeekDayBackFactory, \
+    DeleteDayScheduleCallbackFactory, PlugScheduleLessonWeekDayBackFactory, \
     SentMessagePaymentStudentCallbackFactory, DebtorInformationCallbackFactory, RemoveDebtorFromListCallbackFactory, \
     ShowNextSevenDaysCallbackFactory, ScheduleEditTeacherCallbackFactory, SentMessagePaymentStudentDebtorCallbackFactory
-from database import Student, LessonDay, LessonWeek, AccessStudent
-from database.models import Penalty
-# from database.taskiq_requests import give_scheduled_payment_verification_teachers
+from database import Student, LessonWeek
 from database.teacher_requests import command_add_teacher, command_add_lesson_week, give_installed_lessons_week, \
     delete_week_day, give_all_lessons_day_by_week_day, change_status_pay_student, \
     give_information_of_one_lesson, delete_lesson, delete_teacher_profile, \
-    give_penalty_by_teacher_id, give_all_students_by_teacher, change_status_entry_student, add_student_id_in_database, \
-    delete_student_id_in_database, give_all_students_by_teacher_penalties, delete_all_lessons_student, \
+    give_all_students_by_teacher, change_status_entry_student, add_student_id_in_database, \
+    delete_student_id_in_database, delete_all_lessons_student, \
     give_status_entry_student, give_student_by_teacher_id, \
     give_teacher_profile_by_teacher_id, delete_all_penalties_student, add_penalty_to_student, delete_penalty_of_student, \
-    give_status_pay_student, give_student_by_student_id, give_list_debtors, remove_debtor_from_list_by_id, \
+    give_list_debtors, remove_debtor_from_list_by_id, \
     give_student_by_teacher_id_debtors, update_until_time_notification_teacher, update_daily_schedule_mailing_teacher, \
     update_daily_report_mailing_teacher, update_days_cancellation_teacher, remove_debtor_from_list_by_info
 from filters.teacher_filters import IsTeacherInDatabase, \
-    FindNextSevenDaysFromKeyboard, IsCorrectFormatTime, IsEndBiggerStart, IsDifferenceLessThirtyMinutes, \
+    IsCorrectFormatTime, IsEndBiggerStart, IsDifferenceLessThirtyMinutes, \
     IsConflictWithStart, IsConflictWithEnd, IsLessonWeekInDatabase, \
     IsSomethingToShowSchedule, \
     IsPhoneCorrectInput, IsBankCorrectInput, IsPenaltyCorrectInput, IsInputTimeLongerThanNow, \
-    IsNewDayNotNear, TeacherStartFilter, IsSomethingToPay, IsPenalty, IsNotTeacherAdd, IsHasTeacherStudents, \
-    IsIncorrectTimeInputWithPenalty, IsUntilTimeNotification, IsDailyScheduleMailingTime, IsDailyReportMailingTime, \
+    IsNewDayNotNear, TeacherStartFilter, IsSomethingToPay, IsNotTeacherAdd, IsHasTeacherStudents, \
+    IsUntilTimeNotification, IsDailyScheduleMailingTime, IsDailyReportMailingTime, \
     IsDaysCancellationNotification, IsDebtorsInDatabase
 from fsm.fsm_teacher import FSMRegistrationTeacherForm, FSMRegistrationLessonWeek, FSMAddStudentToStudy, \
     FSMSetUntilTimeNotificationTeacher, FSMSetDailyScheduleMailing, FSMSetDailyReportMailing, \
     FSMSetCancellationNotificationTeacher
 from keyboards.everyone_kb import create_start_kb
 from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb, create_authorization_kb, \
-    show_next_seven_days_kb, create_back_to_profile_kb, create_add_remove_gap_kb, create_all_records_week_day, \
-    show_next_seven_days_pay_kb, show_status_lesson_day_kb, show_next_seven_days_schedule_teacher_kb, \
+    create_back_to_profile_kb, create_add_remove_gap_kb, create_all_records_week_day, \
+    show_status_lesson_day_kb,  \
     show_schedule_lesson_day_kb, back_to_show_schedule_teacher, back_to_show_or_delete_schedule_teacher, \
     settings_teacher_kb, create_management_students_kb, create_list_add_students_kb, \
-    create_back_to_management_students_kb, create_list_delete_students_kb, show_list_of_debtors_kb, back_to_settings_kb, \
+    create_back_to_management_students_kb, create_list_delete_students_kb, back_to_settings_kb, \
     create_notification_confirmation_student_kb, create_list_debtors_kb, change_list_debtors_kb, \
     show_variants_edit_notifications_kb, create_congratulations_edit_notifications_kb, create_lessons_week_teacher_kb, \
     create_config_teacher_kb
 from lexicon.lexicon_everyone import LEXICON_ALL
 from lexicon.lexicon_teacher import LEXICON_TEACHER
-from main import worker
 from services.services import give_list_with_days, give_time_format_fsm, give_date_format_fsm, \
     give_list_registrations_str, show_intermediate_information_lesson_day_status, give_result_info, COUNT_BAN, \
     course_class_choose, NUMERIC_DATE, create_scheduled_task_handler, give_week_day_by_week_date
-from services.services_taskiq import give_available_ids, delete_all_schedules_teacher
-from tasks import daily_newsletter_teacher, activities_day_teacher
+from services.services_taskiq import delete_all_schedules_teacher
 
 # Ученик - ничего не происходит
 # Преподаватель - открываем
 
 router = Router()
-# router.callback_query.filter(MagicData(F.event.from_user.id.in_(F.available_teachers)))
 router.callback_query.filter(TeacherStartFilter())
 
 
 ############################### Логика входа в меню идентификации #######################################
 @router.callback_query(F.data == 'teacher_entrance')
 async def process_entrance(callback: CallbackQuery):
-    # await daily_newsletter_teacher.kiq(7880267101)
-    # await activities_day_teacher.kiq(callback.from_user.id)
     teacher_entrance_kb = create_entrance_kb()
     await callback.message.edit_text(text=LEXICON_TEACHER['menu_identification'],
                                      reply_markup=teacher_entrance_kb)
@@ -204,21 +191,6 @@ async def process_menu_config_teacher(callback: CallbackQuery, callback_data: Sh
                                      reply_markup=create_config_teacher_kb(callback_data.week_date))
 
 ################################# Кнопка РЕДАКТИРОВАНИЕ РАСПИСАНИЯ #################################
-# @router.callback_query(F.data == 'schedule_teacher')
-# async def process_show_schedule(callback: CallbackQuery):
-#     next_seven_days_with_cur = give_list_with_days(datetime.now())
-#
-#     await callback.message.edit_text(text=LEXICON_TEACHER['schedule_teacher_menu'],
-#                                      reply_markup=show_next_seven_days_kb(next_seven_days_with_cur))
-
-
-# # Выбираем кнопку __ДОБАВИТЬ__ или __УДАЛИТЬ__ !
-# @router.callback_query(FindNextSevenDaysFromKeyboard())
-# async def process_menu_add_remove(callback: CallbackQuery, state: FSMContext):
-#     await state.update_data(week_date=callback.data)
-#
-#     await callback.message.edit_text(text=LEXICON_TEACHER['schedule_changes_add_remove'],
-#                                      reply_markup=create_add_remove_gap_kb())
 # Выбираем кнопку __ДОБАВИТЬ__ или __УДАЛИТЬ__ !
 @router.callback_query(ScheduleEditTeacherCallbackFactory.filter())
 async def process_menu_add_remove(callback: CallbackQuery, state: FSMContext,
