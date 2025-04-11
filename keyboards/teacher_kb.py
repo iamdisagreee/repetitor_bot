@@ -14,7 +14,37 @@ from database.teacher_requests import give_student_by_student_id
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from services.services import NUMERIC_DATE
 
+# ------------------------------------- НАСТРОЙКА ОПИСАНИЯ ----------------------------------------
+def create_menu_description_teacher_kb():
+    menu_description_teacher_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_TEACHER['lessons_week_teacher'],
+                                  callback_data='description_lessons_week_teacher')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['management_students'],
+                                  callback_data='description_management_students')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['settings_teacher'],
+                                  callback_data='description_settings_teacher')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['notifications_teacher'],
+                                  callback_data='description_notifications_teacher')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
+                                  callback_data='start')
+             ]
+        ]
+    )
 
+    return menu_description_teacher_kb
+
+def create_back_to_menu_settings_teacher_kb():
+    back_to_menu_settings_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_TEACHER['back'],
+                                  callback_data='help_teacher'),
+            InlineKeyboardButton(text=LEXICON_TEACHER['home'],
+                                  callback_data='start')]
+        ]
+    )
+    return back_to_menu_settings_kb
+# -------------------------------------------------------------------------------------------------
 def create_entrance_kb():
     entrance_kb = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -278,14 +308,16 @@ async def show_schedule_lesson_day_kb(session: AsyncSession,
 
 def back_to_show_or_delete_schedule_teacher(week_date_str,
                                             lesson_on,
-                                            lesson_off):
+                                            lesson_off,
+                                            student_id: int):
     return InlineKeyboardMarkup(inline_keyboard=
     [
         [InlineKeyboardButton(text=LEXICON_TEACHER['delete'],
                               callback_data=DeleteDayScheduleCallbackFactory(
                                   week_date=week_date_str,
                                   lesson_on=lesson_on,
-                                  lesson_off=lesson_off
+                                  lesson_off=lesson_off,
+                                  student_id=student_id
                               ).pack()
                               )],
         [
@@ -300,6 +332,13 @@ def back_to_show_or_delete_schedule_teacher(week_date_str,
     ]
     )
 
+def delete_remove_lesson_by_teacher():
+    return InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_TEACHER['ok'],
+                                  callback_data='remove_lesson_by_teacher'),]
+        ]
+    )
 
 def back_to_show_schedule_teacher(week_date_str):
     return InlineKeyboardMarkup(inline_keyboard=[

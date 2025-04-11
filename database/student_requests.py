@@ -1,14 +1,13 @@
 from datetime import datetime, date, time
 
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select, and_, delete
+from sqlalchemy import select, and_, delete, update
 from sqlalchemy.orm import selectinload
 
 from database import Student, LessonDay, Debtor
 from database.models import Penalty
 from database.models.lesson_week import LessonWeek
 from database.models.teacher import Teacher
-from services.services import give_time_format_fsm
 
 
 # Получаем список всех учителей
@@ -214,6 +213,25 @@ async def give_information_of_lesson(session: AsyncSession,
 
     return result.scalars()
 
+async def change_formed_status_lessons_day(session: AsyncSession,
+                                           student_id: int,
+                                           week_date: date,
+                                           lesson_on: time,
+                                           lesson_off: time):
+    await session.execute(
+        update(LessonDay)
+        .where(
+            and_(
+                LessonDay.student_id == student_id,
+                LessonDay.week_date == week_date,
+                LessonDay.lesson_start >= lesson_on,
+                LessonDay.lesson_finished <= lesson_off
+            )
+        )
+        .values(is_formed=True)
+    )
+
+    await session.commit()
 
 async def delete_student_profile(session: AsyncSession,
                                  student_id: int):

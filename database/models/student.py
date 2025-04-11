@@ -1,7 +1,9 @@
 from datetime import datetime
 
-from sqlalchemy import BigInteger, func, Integer, ForeignKey, String, DateTime
+from marshmallow.fields import Boolean
+from sqlalchemy import BigInteger, func, Integer, ForeignKey, String, DateTime, Boolean
 from sqlalchemy.orm import mapped_column, Mapped, relationship
+from sqlalchemy.sql import expression
 
 from database.base import Base
 # from database import Teacher, LessonDay

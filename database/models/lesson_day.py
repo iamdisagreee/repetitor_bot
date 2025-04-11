@@ -41,6 +41,8 @@ class LessonDay(Base):
         nullable=False
     )
 
+    is_formed: Mapped[int] = mapped_column(Boolean,server_default=expression.false())
+
     status: Mapped[bool] = mapped_column(Boolean,
                                          nullable=True,
                                          server_default=expression.false(),

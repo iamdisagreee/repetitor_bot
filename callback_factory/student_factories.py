@@ -40,6 +40,9 @@ class StartEndLessonDayCallbackFactory(CallbackData, prefix='start_end_lesson', 
     lesson_on: str
     lesson_off: str
 
+class StartEndLessonDayNotFormedCallbackFactory(CallbackData, prefix='lesson_formed', sep=';'):
+    lesson_on: str
+    lesson_off: str
 
 class ChangeStatusOfAddListCallbackFactory(CallbackData, prefix='change_status'):
     student_id: int

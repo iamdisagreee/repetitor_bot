@@ -6,7 +6,8 @@ from aiogram.utils.keyboard import InlineKeyboardBuilder
 from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
     StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory, InformationLessonCallbackFactory, \
-    RemoveDayOfScheduleCallbackFactory, ShowNextSevenDaysStudentCallbackFactory, ScheduleEditStudentCallbackFactory
+    RemoveDayOfScheduleCallbackFactory, ShowNextSevenDaysStudentCallbackFactory, ScheduleEditStudentCallbackFactory, \
+    StartEndLessonDayNotFormedCallbackFactory
 from callback_factory.taskiq_factories import InformationLessonWithDeleteCallbackFactory
 from callback_factory.teacher_factories import SentMessagePaymentStudentCallbackFactory, \
     ScheduleShowTeacherCallbackFactory, ShowInfoDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, \
@@ -15,7 +16,37 @@ from lexicon.lexicon_student import LEXICON_STUDENT
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from services.services import NUMERIC_DATE
 
+# ------------------------------------- НАСТРОЙКА ОПИСАНИЯ ----------------------------------------
+def create_menu_description_student_kb():
+    menu_description_student_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_STUDENT['lessons_student'],
+                                  callback_data='description_lessons_student')],
+            [InlineKeyboardButton(text=LEXICON_STUDENT['penalties'],
+                                  callback_data='description_penalties_student')],
+            [InlineKeyboardButton(text=LEXICON_STUDENT['debts'],
+                                  callback_data='description_debts_student')],
+            [InlineKeyboardButton(text=LEXICON_STUDENT['settings_student'],
+                                  callback_data='description_settings_student')],
+            [InlineKeyboardButton(text=LEXICON_STUDENT['notifications_student'],
+                                  callback_data='description_notifications_student')],
+            [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
+                                  callback_data='start')]
+        ]
+    )
+    return menu_description_student_kb
 
+def create_back_to_menu_settings_student_kb():
+    back_to_menu_settings_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
+                                  callback_data='help_student'),
+            InlineKeyboardButton(text=LEXICON_STUDENT['home'],
+                                  callback_data='start')]
+        ]
+    )
+    return back_to_menu_settings_kb
+# --------------------------------------------------------------------------------------------
 def create_entrance_kb():
     entrance_kb = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -254,19 +285,35 @@ def show_next_seven_days_schedule_kb(*days):
 def all_lessons_for_day_kb(lessons, week_date):
     builder = InlineKeyboardBuilder()
     buttons = []
+    variants = ['❔', '📋']
     for lesson in lessons:
-        buttons.append(
-            InlineKeyboardButton(
-                text=LEXICON_STUDENT['all_lessons_for_day_kb']
-                .format(lesson['start'].strftime("%H:%M"),
-                        lesson['finished'].strftime("%H:%M")),
-                callback_data=StartEndLessonDayCallbackFactory
-                    (
-                    lesson_on=lesson['start'].strftime("%H:%M"),
-                    lesson_off=lesson['finished'].strftime("%H:%M")
-                ).pack()
+        is_formed = lesson['count_gaps'] == lesson['count_is_formed']
+        text=LEXICON_STUDENT['all_lessons_for_day_kb']\
+                .format(variants[is_formed],
+                        lesson['start'].strftime("%H:%M"),
+                        lesson['finished'].strftime("%H:%M"))
+
+        if is_formed:
+            buttons.append(
+                InlineKeyboardButton(
+                    text=text,
+                    callback_data=StartEndLessonDayCallbackFactory
+                        (
+                        lesson_on=lesson['start'].strftime("%H:%M"),
+                        lesson_off=lesson['finished'].strftime("%H:%M")
+                    ).pack()
+                )
             )
-        )
+        else:
+            buttons.append(
+                InlineKeyboardButton(
+                    text=text,
+                    callback_data=StartEndLessonDayNotFormedCallbackFactory(
+                        lesson_on=lesson['start'].strftime("%H:%M"),
+                        lesson_off=lesson['finished'].strftime("%H:%M")
+                    ).pack()
+                )
+            )
     buttons.append(InlineKeyboardButton(text=LEXICON_STUDENT['back'],
                                         callback_data=ShowNextSevenDaysStudentCallbackFactory(
                                             week_date=str(week_date)

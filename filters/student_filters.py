@@ -246,6 +246,25 @@ class IsTimeNotExpired(BaseFilter):
         # print('now: ', datetime.now(),'will: ', choose_datetime - penalty_delta)
         return datetime.now() < choose_datetime - penalty_delta
 
+class IsFormeGapLesson(BaseFilter):
+    async def __call__(self, callback: CallbackQuery, session: AsyncSession,
+                       callback_data: DeleteFieldCallbackFactory):
+        week_date = give_date_format_fsm(callback_data.week_date)
+        lesson_start = give_time_format_fsm(callback_data.lesson_start)
+        lesson_finished = give_time_format_fsm(callback_data.lesson_finished)
+        lesson_day = (await session.execute(
+            select(LessonDay)
+            .where(
+                and_(
+                    LessonDay.student_id == callback.from_user.id,
+                    LessonDay.week_date == week_date,
+                    LessonDay.lesson_start == lesson_start,
+                    LessonDay.lesson_finished == lesson_finished
+                )
+            )
+        )).scalar()
+
+        return not lesson_day.is_formed
 
 #Подтверждена уже оплата или нет
 #Если нет, то отправляем teacher_id для дальнейшей работы

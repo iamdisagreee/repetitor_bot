@@ -40,13 +40,13 @@ from fsm.fsm_teacher import FSMRegistrationTeacherForm, FSMRegistrationLessonWee
 from keyboards.everyone_kb import create_start_kb
 from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb, create_authorization_kb, \
     create_back_to_profile_kb, create_add_remove_gap_kb, create_all_records_week_day, \
-    show_status_lesson_day_kb,  \
+    show_status_lesson_day_kb, \
     show_schedule_lesson_day_kb, back_to_show_schedule_teacher, back_to_show_or_delete_schedule_teacher, \
     settings_teacher_kb, create_management_students_kb, create_list_add_students_kb, \
     create_back_to_management_students_kb, create_list_delete_students_kb, back_to_settings_kb, \
     create_notification_confirmation_student_kb, create_list_debtors_kb, change_list_debtors_kb, \
     show_variants_edit_notifications_kb, create_congratulations_edit_notifications_kb, create_lessons_week_teacher_kb, \
-    create_config_teacher_kb
+    create_config_teacher_kb, delete_remove_lesson_by_teacher
 from lexicon.lexicon_everyone import LEXICON_ALL
 from lexicon.lexicon_teacher import LEXICON_TEACHER
 from services.services import give_list_with_days, give_time_format_fsm, give_date_format_fsm, \
@@ -608,7 +608,9 @@ async def process_show_lesson_info(callback: CallbackQuery, session: AsyncSessio
                                      reply_markup=back_to_show_or_delete_schedule_teacher
                                      (week_date_str,
                                       callback_data.lesson_on,
-                                      callback_data.lesson_off)
+                                      callback_data.lesson_off,
+                                      lesson_day.student_id
+                                      )
                                      )
 
 
@@ -626,7 +628,7 @@ async def process_show_schedule_teacher(callback: CallbackQuery):
 
 ################################ Нажали на кнопку __удалить__ в информации о дне ###################
 @router.callback_query(DeleteDayScheduleCallbackFactory.filter())
-async def process_delete_lesson(callback: CallbackQuery, session: AsyncSession,
+async def process_delete_lesson(callback: CallbackQuery, session: AsyncSession, bot: Bot,
                                 callback_data: DeleteDayScheduleCallbackFactory):
     week_date = give_date_format_fsm(callback_data.week_date)
     lesson_on = give_time_format_fsm(callback_data.lesson_on)
@@ -636,9 +638,19 @@ async def process_delete_lesson(callback: CallbackQuery, session: AsyncSession,
                         week_date,
                         lesson_on,
                         lesson_off)
+    # Отправляем сообщение ученику
+    await bot.send_message(chat_id=callback_data.student_id,
+                           text=LEXICON_TEACHER['send_delete_lesson_student']
+                           .format(week_date.strftime("%d.%m"),
+                                   give_week_day_by_week_date(week_date),
+                                   callback_data.lesson_on,
+                                   callback_data.lesson_off),
+                           reply_markup=delete_remove_lesson_by_teacher()
+                           )
 
     await callback.message.edit_text(text=LEXICON_TEACHER['success_delete_lesson'],
                                      reply_markup=back_to_show_schedule_teacher(callback_data.week_date))
+    await callback.answer(text=LEXICON_TEACHER['notification_delete_sent'])
 
 
 ########################################## Кнопка __Настройки__ в главном меню ################################
@@ -997,7 +1009,7 @@ async def process_confirmation_day_teacher(callback: CallbackQuery, bot: Bot):
 async def create_notice_lesson_certain_time_student(callback: CallbackQuery, bot: Bot):
     await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
 
-# Нажимаем __ОК__, когда пришло уведомление об отмене занятияX
+# Нажимаем __ОК__, когда пришло уведомление об отмене занятия]
 @router.callback_query(F.data == 'ok_remove_day_schedule_student')
 async def create_ok_remove_day_schedule_student(callback: CallbackQuery, bot: Bot):
     await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)

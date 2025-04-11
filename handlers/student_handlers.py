@@ -12,19 +12,20 @@ from sqlalchemy import select
 from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyAddFieldCallbackFactory, \
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
     StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory, InformationLessonCallbackFactory, \
-    RemoveDayOfScheduleCallbackFactory, ShowNextSevenDaysStudentCallbackFactory, ScheduleEditStudentCallbackFactory
+    RemoveDayOfScheduleCallbackFactory, ShowNextSevenDaysStudentCallbackFactory, ScheduleEditStudentCallbackFactory, \
+    StartEndLessonDayNotFormedCallbackFactory
 from callback_factory.taskiq_factories import InformationLessonWithDeleteCallbackFactory
 from database import Student, LessonDay
 from database.student_requests import command_get_all_teachers, command_add_students, give_lessons_week_for_day, \
     add_lesson_day, give_teacher_by_student_id, give_all_busy_time_intervals, \
     give_all_lessons_for_day, remove_lesson_day, give_week_id_by_teacher_id, \
     give_information_of_lesson, delete_student_profile, give_students_penalty, \
-    delete_gap_lessons_by_student, add_until_time_notification
+    delete_gap_lessons_by_student, add_until_time_notification, change_formed_status_lessons_day
 from filters.student_filters import IsStudentInDatabase, IsInputFieldAlpha, \
     IsMoveRightAddMenu, IsMoveLeftMenu, IsTeacherDidSlots, IsStudentChooseSlots, \
     IsMoveRightRemoveMenu, IsLessonsInChoseDay, IsTimeNotExpired, IsFreeSlots, IsTeacherDidSystemPenalties, \
     IsStudentHasPenalties, StudentStartFilter, IsRightClassCourse, IsRightPrice, \
-    IsNotAlreadyConfirmed, IsUntilTimeNotification, IsDebtsStudent
+    IsNotAlreadyConfirmed, IsUntilTimeNotification, IsDebtsStudent, IsFormeGapLesson
 from fsm.fsm_student import FSMRegistrationStudentForm, FSMUntilTimeNotification
 from keyboards.everyone_kb import create_start_kb
 from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, create_level_choice_kb, \
@@ -441,7 +442,7 @@ async def process_remove_time_study(callback: CallbackQuery,
 
 
 # Настраиваем удаление записей по нажатию на кнопку! + Ограничение по удалению не наступило!
-@router.callback_query(DeleteFieldCallbackFactory.filter(), IsTimeNotExpired())
+@router.callback_query(DeleteFieldCallbackFactory.filter(), IsTimeNotExpired(), IsFormeGapLesson())
 async def process_touch_menu_remove(callback: CallbackQuery, session: AsyncSession, state: FSMContext,
                                     callback_data: DeleteFieldCallbackFactory):
     state_dict = await state.get_data()
@@ -515,6 +516,10 @@ async def process_not_remove_time_study(callback: CallbackQuery):
 async def process_not_touch_menu_remove(callback: CallbackQuery):
     await callback.answer(text=LEXICON_STUDENT['time_delete_expired'])
 
+# Случай, когда мы не можем __удалить__ потому что занятие уже сформировано
+@router.callback_query(DeleteFieldCallbackFactory.filter(), ~IsFormeGapLesson())
+async def process_not_formed_lesson(callback: CallbackQuery):
+    await callback.answer(text=LEXICON_STUDENT['gap_already_formed'])
 
 # Случай, когда нажимаем на пустую кнопку
 @router.callback_query(EmptyRemoveFieldCallbackFactory.filter())
@@ -535,7 +540,7 @@ async def process_not_move_left_remove(callback: CallbackQuery):
 
 
 ########################## Кнопка __Мое расписание__ ######################################
-# Выбираем день занятия (нажимаем на этот день)
+# Вываливается список занятий на день
 @router.callback_query(ShowDaysOfScheduleCallbackFactory.filter(), IsLessonsInChoseDay())
 async def process_show_lessons_for_day(callback: CallbackQuery,
                                        callback_data: ShowDaysOfScheduleCallbackFactory,
@@ -552,14 +557,64 @@ async def process_show_lessons_for_day(callback: CallbackQuery,
                                                                          week_date)
                                      )
 
-
 # Нечего смотреть в выбранном дне
 @router.callback_query(ShowDaysOfScheduleCallbackFactory.filter(), ~IsLessonsInChoseDay())
 async def process_not_show_lessons_for_day(callback: CallbackQuery):
     await callback.answer(LEXICON_STUDENT['not_choose_gaps'])
 
+# Нажимаем на временной промежуток, чтобы посмотреть подробную информацию
+# Но он не сформирован ❔
+@router.callback_query(StartEndLessonDayNotFormedCallbackFactory.filter())
+async def process_form_all_lessons_day(callback: CallbackQuery, session: AsyncSession,
+                                       state: FSMContext,
+                                       callback_data: StartEndLessonDayNotFormedCallbackFactory):
+    week_date_str = (await state.get_data())['week_date']
+    week_date = give_date_format_fsm(week_date_str)
+    lesson_on = give_time_format_fsm(callback_data.lesson_on)
+    lesson_off = give_time_format_fsm(callback_data.lesson_off)
+
+    # Меняем статус is_formed для всех занятий из промежутка
+    await change_formed_status_lessons_day(session,
+                                           callback.from_user.id,
+                                           week_date,
+                                           lesson_on,
+                                           lesson_off)
+
+    # Все тоже самое, как в выводе информации об уроке
+    student = await give_teacher_by_student_id(session,
+                                               callback.from_user.id)
+    await callback.answer(text=LEXICON_STUDENT['formed_successfully'],
+                          show_alert=True)
+
+    information_of_status_lesson = await give_information_of_lesson(session,
+                                                                    callback.from_user.id,
+                                                                    week_date,
+                                                                    lesson_on,
+                                                                    lesson_off)
+
+    # Общая информация для определения статуса оплаты и общей суммы занятия
+    result_status, counter_lessons = give_result_status_timeinterval(information_of_status_lesson)
+
+    # Получаем информацию об уроке в зависимости от системы пенальти
+    text_information_lesson = give_text_information_lesson(student,
+                                                           week_date,
+                                                           lesson_on,
+                                                           lesson_off,
+                                                           result_status,
+                                                           counter_lessons)
+
+    # Выводим информацию
+    await callback.message.edit_text(text=text_information_lesson,
+                                     reply_markup=create_button_for_back_to_all_lessons_day(week_date_str,
+                                                                                            student,
+                                                                                            callback_data.lesson_on,
+                                                                                            callback_data.lesson_off,
+                                                                                            counter_lessons)
+                                     )
+
 
 # Нажимаем на временной промежуток, чтобы посмотреть подробную информацию
+# Он сформирован ✔️
 @router.callback_query(StartEndLessonDayCallbackFactory.filter())
 async def process_show_full_information_lesson(callback: CallbackQuery, session: AsyncSession,
                                                callback_data: StartEndLessonDayCallbackFactory,
@@ -689,12 +744,14 @@ async def process_remove_lesson_student(callback: CallbackQuery, bot: Bot, sessi
                                          reply_markup=all_lessons_for_day_kb(all_lessons_for_day_ordered_list,
                                                                              week_date_date)
                                          )
-    #### Если это была единственная запись - то пробрасываем в меню выбора дней
+    #### Если это была единственная запись - то пробрасываем в меню выбора действий
     else:
-        next_seven_days_with_cur = give_list_with_days(datetime.now())
-
-        await callback.message.edit_text(text=LEXICON_STUDENT['my_schedule_menu'],
-                                         reply_markup=show_next_seven_days_schedule_kb(*next_seven_days_with_cur))
+        await callback.message.edit_text(text=LEXICON_STUDENT['header_config_student']
+                                         .format(week_date_date.strftime("%d.%m"),
+                                                 give_week_day_by_week_date(week_date_date).upper()
+                                                 ),
+                                         reply_markup=create_config_student_kb(callback_data.week_date)
+                                         )
 
     ########## Отправляем информацию об удалении учителю в случае, если время удаления занятия находится в диапазоне дней,
     ########## когда учитель хочет получать информацию
@@ -859,4 +916,10 @@ async def process_not_penalties(callback: CallbackQuery):
 # Нажимаем __ОК__, когда пришло уведомление за какое-то время до занятия
 @router.callback_query(F.data == 'notice_lesson_certain_time_student')
 async def create_notice_lesson_certain_time_student(callback: CallbackQuery, bot: Bot):
+    await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)
+
+
+# Нажимаем __ОК__, когда пришло уведомление об отмене занятия
+@router.callback_query(F.data == 'remove_lesson_by_teacher')
+async def create_notice_remove_lesson_by_teacher(callback: CallbackQuery, bot: Bot):
     await bot.delete_message(chat_id=callback.message.chat.id, message_id=callback.message.message_id)

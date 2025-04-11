@@ -135,18 +135,26 @@ def show_all_lessons_for_day(all_lessons_for_day):
     result = []
     all_lessons_for_day = list(all_lessons_for_day)
     cur_list = {'start': all_lessons_for_day[0].lesson_start,
-                'finished': all_lessons_for_day[0].lesson_finished}
+                'finished': all_lessons_for_day[0].lesson_finished,
+                'count_gaps': 1,
+                'count_is_formed': all_lessons_for_day[0].is_formed}
 
     for lesson in all_lessons_for_day[1:]:
         cur_start = lesson.lesson_start
         cur_finished = lesson.lesson_finished
+        is_formed = lesson.is_formed
 
         if cur_list['finished'] == cur_start:
             cur_list['finished'] = cur_finished
+            cur_list['count_gaps'] += 1
+            cur_list['count_is_formed'] += is_formed
         else:
             result.append(cur_list)
             cur_list = {'start': cur_start,
-                        'finished': cur_finished}
+                        'finished': cur_finished,
+                        'count_gaps': 1,
+                        'count_is_formed': is_formed}
+
     result.append(cur_list)
     return result
 
