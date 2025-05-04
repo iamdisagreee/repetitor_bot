@@ -25,7 +25,8 @@ from database.teacher_requests import command_add_teacher, command_add_lesson_we
     give_teacher_profile_by_teacher_id, delete_all_penalties_student, add_penalty_to_student, delete_penalty_of_student, \
     give_list_debtors, remove_debtor_from_list_by_id, \
     give_student_by_teacher_id_debtors, update_until_time_notification_teacher, update_daily_schedule_mailing_teacher, \
-    update_daily_report_mailing_teacher, update_days_cancellation_teacher, remove_debtor_from_list_by_info
+    update_daily_report_mailing_teacher, update_days_cancellation_teacher, remove_debtor_from_list_by_info, \
+    update_days_confirmation_notification
 from filters.teacher_filters import IsTeacherInDatabase, \
     IsCorrectFormatTime, IsEndBiggerStart, IsDifferenceLessThirtyMinutes, \
     IsConflictWithStart, IsConflictWithEnd, IsLessonWeekInDatabase, \
@@ -33,10 +34,10 @@ from filters.teacher_filters import IsTeacherInDatabase, \
     IsPhoneCorrectInput, IsBankCorrectInput, IsPenaltyCorrectInput, IsInputTimeLongerThanNow, \
     IsNewDayNotNear, TeacherStartFilter, IsSomethingToPay, IsNotTeacherAdd, IsHasTeacherStudents, \
     IsUntilTimeNotification, IsDailyScheduleMailingTime, IsDailyReportMailingTime, \
-    IsDaysCancellationNotification, IsDebtorsInDatabase
+    IsDaysNotificationsRight, IsDebtorsInDatabase
 from fsm.fsm_teacher import FSMRegistrationTeacherForm, FSMRegistrationLessonWeek, FSMAddStudentToStudy, \
     FSMSetUntilTimeNotificationTeacher, FSMSetDailyScheduleMailing, FSMSetDailyReportMailing, \
-    FSMSetCancellationNotificationTeacher
+    FSMSetCancellationNotificationTeacher, FSMSetDailyConfirmationNotification
 from keyboards.everyone_kb import create_start_kb
 from keyboards.teacher_kb import create_entrance_kb, create_back_to_entrance_kb, create_authorization_kb, \
     create_back_to_profile_kb, create_add_remove_gap_kb, create_all_records_week_day, \
@@ -561,7 +562,7 @@ async def process_change_status_payment_message(callback: CallbackQuery, session
 
 # Ловим апдейт с конкретным днем, и показываем все временные промежутки за день
 @router.callback_query(ShowDaysOfScheduleTeacherCallbackFactory.filter(), IsSomethingToShowSchedule())
-async def process_show_schedule_teacher(callback: CallbackQuery, session: AsyncSession,
+async def process_show_schedule_teacher(callback: CallbackQuery,
                                         list_lessons_not_formatted: list[LessonWeek],
                                         week_date_str: str):
     week_date = give_date_format_fsm(week_date_str)
@@ -569,10 +570,10 @@ async def process_show_schedule_teacher(callback: CallbackQuery, session: AsyncS
     intermediate_buttons = show_intermediate_information_lesson_day_status(list_lessons_not_formatted)
     await callback.message.edit_text(text=LEXICON_TEACHER['schedule_lesson_day']
                                      .format(week_date.strftime("%d.%m"),
-                                             give_week_day_by_week_date(week_date)),
-                                     reply_markup=await show_schedule_lesson_day_kb(session,
-                                                                                    intermediate_buttons,
-                                                                                    week_date_str)
+                                             give_week_day_by_week_date(week_date).upper()),
+                                     reply_markup=show_schedule_lesson_day_kb(intermediate_buttons,
+                                                                                    week_date_str
+                                                                                    )
                                      )
 
 
@@ -768,6 +769,25 @@ async def process_give_daily_report(message: Message, state: FSMContext,
     await message.answer(LEXICON_TEACHER['congratulations_edit_notices'],
                          reply_markup=create_congratulations_edit_notifications_kb())
 
+# Нажали на __Уведомление о формировании занятий учениками__
+@router.callback_query(F.data == 'set_daily_confirmation_notification')
+async def process_set_daily_confirmation_notification(callback: CallbackQuery, state: FSMContext):
+    await state.set_state(FSMSetDailyConfirmationNotification.fill_daily_confirmation_notification)
+    await callback.message.answer(text=LEXICON_TEACHER['fill_daily_confirmation_notification'])
+    await callback.answer()
+
+# Ловим значение __Уведомление о формировании занятий учениками__
+@router.message(StateFilter(FSMSetDailyConfirmationNotification.fill_daily_confirmation_notification),
+                IsDaysNotificationsRight())
+async def process_give_daily_confirmation_notification(message: Message, state: FSMContext,
+                                                       session: AsyncSession):
+    await state.clear()
+    await update_days_confirmation_notification(session,
+                                                message.from_user.id,
+                                                int(message.text))
+    await message.answer(LEXICON_TEACHER['congratulations_edit_notices'],
+                         reply_markup=create_congratulations_edit_notifications_kb())
+
 #Нажали на __Уведомления об отмене занятий__
 @router.callback_query(F.data == 'set_cancellation_notification')
 async def process_set_cancellation_notification(callback: CallbackQuery, state: FSMContext):
@@ -777,7 +797,7 @@ async def process_set_cancellation_notification(callback: CallbackQuery, state: 
 
 #Ловим значение __Уведомления об отмене занятий__
 @router.message(StateFilter(FSMSetCancellationNotificationTeacher.fill_cancellation_notification),
-                IsDaysCancellationNotification())
+                IsDaysNotificationsRight())
 async def process_give_cancellation_notification(message: Message, state: FSMContext,
                                                  session: AsyncSession):
     await state.clear()
@@ -801,6 +821,11 @@ async def process_wrong_daily_schedule_mailing_time_sent(message: Message):
 @router.message(StateFilter(FSMSetDailyReportMailing.fill_daily_report_mailing_time))
 async def process_wrong_daily_report_mailing_time_sent(message: Message):
     await message.answer(text=LEXICON_TEACHER['not_fill_daily_report_mailing_time'])
+
+# Случай, когда неправильно кол-во дней для уведомлений об формировании
+@router.message(StateFilter(FSMSetDailyConfirmationNotification.fill_daily_confirmation_notification))
+async def process_wrong_give_cancellation_notification(message: Message):
+    await message.answer(text=LEXICON_TEACHER['not_fill_daily_confirmation_notification'])
 
 # Случай, когда неправильно кол-во дней для уведомлений об удалении
 @router.message(StateFilter(FSMSetCancellationNotificationTeacher.fill_cancellation_notification))

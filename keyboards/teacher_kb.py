@@ -256,9 +256,8 @@ async def show_status_lesson_day_kb(cur_buttons,
     return builder.as_markup()
 
 
-async def show_schedule_lesson_day_kb(session: AsyncSession,
-                                      cur_buttons,
-                                      week_date_str: str):
+def show_schedule_lesson_day_kb(cur_buttons,
+                                week_date_str: str):
     builder = InlineKeyboardBuilder()
     res_buttons = []
     for button in cur_buttons:
@@ -266,13 +265,13 @@ async def show_schedule_lesson_day_kb(session: AsyncSession,
             status_bool = len(button['list_status']) == sum(button['list_status'])
             status = LEXICON_TEACHER['paid'] if status_bool \
                 else LEXICON_TEACHER['not_paid']
-            student = await give_student_by_student_id(session, button['student_id'])
+            # student = await give_student_by_student_id(session, button['student_id'])
             callback_data = ShowInfoDayCallbackFactory(
                 lesson_on=button['lesson_on'].strftime("%H:%M"),
                 lesson_off=button['lesson_off'].strftime("%H:%M"),
                 week_date=week_date_str,
                 status=status_bool,
-                price=student.price / 2 * len(button['list_status'])
+                price=button['price'] / 2 * len(button['list_status'])
             ).pack()
         else:
             status = LEXICON_TEACHER['not_reserved']
@@ -381,6 +380,8 @@ def show_variants_edit_notifications_kb():
                                   callback_data='set_daily_schedule_mailing_time')],
             [InlineKeyboardButton(text=LEXICON_TEACHER['daily_report_mailing_time_button'],
                                   callback_data='set_daily_report_mailing_time')],
+            [InlineKeyboardButton(text=LEXICON_TEACHER['daily_confirmation_notification'],
+                                  callback_data='set_daily_confirmation_notification')],
             [InlineKeyboardButton(text=LEXICON_TEACHER['cancellation_notification'],
                                   callback_data='set_cancellation_notification')],
             [InlineKeyboardButton(text=LEXICON_TEACHER['back'],

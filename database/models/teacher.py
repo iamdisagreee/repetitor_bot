@@ -1,4 +1,4 @@
-from datetime import date, datetime, time
+from datetime import datetime, time
 
 from sqlalchemy import BigInteger, String, DateTime, func, ForeignKey, Time, Integer, text
 from sqlalchemy.orm import mapped_column, Mapped, relationship
@@ -24,6 +24,8 @@ class Teacher(Base):
                                                               nullable=True)
     daily_report_mailing_time: Mapped[time] = mapped_column(Time,
                                                             nullable=True)
+    daily_confirmation_notification: Mapped[int] = mapped_column(Integer,
+                                                                 nullable=True)
     days_cancellation_notification: Mapped[int] = mapped_column(Integer,
                                                                 nullable=True)
 

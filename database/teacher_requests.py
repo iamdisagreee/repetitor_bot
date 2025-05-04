@@ -141,7 +141,7 @@ async def give_all_lessons_day_by_week_day(session: AsyncSession,
             )
         )
         .order_by(LessonWeek.work_start)
-        .options(selectinload(LessonWeek.lessons))
+        .options(selectinload(LessonWeek.lessons).selectinload(LessonDay.student))
     )
 
     result = await session.execute(stmt)
@@ -530,6 +530,16 @@ async def update_daily_report_mailing_teacher(session: AsyncSession,
         .where(Teacher.teacher_id == teacher_id)
     )).scalar()
     teacher.daily_report_mailing_time = daily_report_mailing_time
+    await session.commit()
+
+async def update_days_confirmation_notification(session: AsyncSession,
+                                                teacher_id: int,
+                                                days_confirmation_notification: int):
+    teacher = (await session.execute(
+        select(Teacher)
+        .where(Teacher.teacher_id == teacher_id)
+    )).scalar()
+    teacher.days_confirmation_notification = days_confirmation_notification
     await session.commit()
 
 async def update_days_cancellation_teacher(session: AsyncSession,

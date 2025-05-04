@@ -7,7 +7,8 @@ from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyA
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
     StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory, InformationLessonCallbackFactory, \
     RemoveDayOfScheduleCallbackFactory, ShowNextSevenDaysStudentCallbackFactory, ScheduleEditStudentCallbackFactory, \
-    StartEndLessonDayNotFormedCallbackFactory
+    StartEndLessonDayFormedCallbackFactory, StartEndLessonDayNotFormedCallbackFactory, \
+    StartEndLessonDayWillFormedCallbackFactory
 from callback_factory.taskiq_factories import InformationLessonWithDeleteCallbackFactory
 from callback_factory.teacher_factories import SentMessagePaymentStudentCallbackFactory, \
     ScheduleShowTeacherCallbackFactory, ShowInfoDayCallbackFactory, ShowDaysOfScheduleTeacherCallbackFactory, \
@@ -308,7 +309,8 @@ def all_lessons_for_day_kb(lessons, week_date):
             buttons.append(
                 InlineKeyboardButton(
                     text=text,
-                    callback_data=StartEndLessonDayNotFormedCallbackFactory(
+                    callback_data=StartEndLessonDayWillFormedCallbackFactory(
+                        week_date=str(week_date),
                         lesson_on=lesson['start'].strftime("%H:%M"),
                         lesson_off=lesson['finished'].strftime("%H:%M")
                     ).pack()
@@ -328,6 +330,35 @@ def all_lessons_for_day_kb(lessons, week_date):
 
     return builder.as_markup()
 
+def is_form_lesson_kb(week_date,
+                    lesson_on,
+                    lesson_off):
+    form_lesson_kb = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_STUDENT['yes'],
+                                  callback_data=StartEndLessonDayFormedCallbackFactory(
+                                      week_date=week_date,
+                                      lesson_on=lesson_on,
+                                      lesson_off=lesson_off
+                                  ).pack()
+                                  )],
+            [InlineKeyboardButton(text=LEXICON_STUDENT['no'],
+                                  callback_data=StartEndLessonDayNotFormedCallbackFactory(
+                                      week_date=week_date,
+                                      lesson_on=lesson_on,
+                                      lesson_off=lesson_off
+                                  ).pack()
+                                  )],
+            [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
+                                  callback_data=ShowDaysOfScheduleCallbackFactory(
+                                      week_date=week_date
+                                  ).pack()
+                                  ),
+             InlineKeyboardButton(text=LEXICON_STUDENT['home'],
+                                  callback_data='auth_student')]
+        ]
+    )
+    return form_lesson_kb
 
 def create_button_for_back_to_all_lessons_day(week_date_str,
                                               student,
@@ -365,11 +396,26 @@ def create_button_for_back_to_all_lessons_day(week_date_str,
              ]
         ]
     )
+    return button_for_back_to_all_lessons_day
+
+def create_button_for_back_to_all_lessons_not_formed_day(week_date_str):
+    button_for_back_to_all_lessons_day = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text=LEXICON_STUDENT['back'],
+                                  callback_data=ShowDaysOfScheduleCallbackFactory(
+                                      week_date=week_date_str
+                                  ).pack()
+                                  )
+             ,
+             InlineKeyboardButton(text=LEXICON_TEACHER['home'],
+                                  callback_data='auth_student')
+            ]
+        ]
+    )
 
     return button_for_back_to_all_lessons_day
 
-
-def create_ok_remove_day_schedule_student_kb(week_date):
+def create_ok_show_day_schedule_student_kb(week_date):
     ok_remove_day_schedule_student_kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(text=LEXICON_STUDENT['to_schedule'],

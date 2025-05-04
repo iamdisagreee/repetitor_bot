@@ -13,6 +13,7 @@ from callback_factory.student_factories import ExistFieldCallbackFactory, EmptyA
     DeleteFieldCallbackFactory, EmptyRemoveFieldCallbackFactory, ShowDaysOfScheduleCallbackFactory, \
     StartEndLessonDayCallbackFactory, PlugPenaltyStudentCallbackFactory, InformationLessonCallbackFactory, \
     RemoveDayOfScheduleCallbackFactory, ShowNextSevenDaysStudentCallbackFactory, ScheduleEditStudentCallbackFactory, \
+    StartEndLessonDayFormedCallbackFactory, StartEndLessonDayWillFormedCallbackFactory, \
     StartEndLessonDayNotFormedCallbackFactory
 from callback_factory.taskiq_factories import InformationLessonWithDeleteCallbackFactory
 from database import Student, LessonDay
@@ -33,15 +34,16 @@ from keyboards.student_kb import create_entrance_kb, create_teachers_choice_kb, 
     create_choose_time_student_kb, create_delete_lessons_menu, show_next_seven_days_schedule_kb, all_lessons_for_day_kb, \
     create_button_for_back_to_all_lessons_day, create_settings_profile_kb, create_information_penalties, \
     create_back_to_settings_student_kb, create_confirm_payment_teacher_kb, \
-    create_ok_remove_day_schedule_student_kb, create_debts_student_kb, show_next_seven_days_student_kb, \
+    create_ok_show_day_schedule_student_kb, create_debts_student_kb, show_next_seven_days_student_kb, \
     create_config_student_kb, show_variants_edit_notifications_student_kb, \
-    create_congratulations_edit_notifications_student_kb, create_confirm_payment_teacher_by_debtor_kb
+    create_congratulations_edit_notifications_student_kb, create_confirm_payment_teacher_by_debtor_kb, \
+    is_form_lesson_kb, create_button_for_back_to_all_lessons_not_formed_day
 from lexicon.lexicon_everyone import LEXICON_ALL
 from lexicon.lexicon_student import LEXICON_STUDENT
 from services.services import give_list_with_days, create_choose_time_student, give_date_format_fsm, \
     give_time_format_fsm, create_delete_time_student, show_all_lessons_for_day, \
     give_text_information_lesson, course_class_choose, COUNT_BAN, give_result_status_timeinterval, NUMERIC_DATE, \
-    is_correct_sent_delete_lesson_for_teacher, give_week_day_by_week_date
+    is_correct_sent_notification_lesson_for_teacher, give_week_day_by_week_date
 from services.services_taskiq import delete_all_schedules_student
 
 # Преподаватель - нет доступа
@@ -563,13 +565,22 @@ async def process_not_show_lessons_for_day(callback: CallbackQuery):
     await callback.answer(LEXICON_STUDENT['not_choose_gaps'])
 
 # Нажимаем на временной промежуток, чтобы посмотреть подробную информацию
-# Но он не сформирован ❔
-@router.callback_query(StartEndLessonDayNotFormedCallbackFactory.filter())
-async def process_form_all_lessons_day(callback: CallbackQuery, session: AsyncSession,
-                                       state: FSMContext,
-                                       callback_data: StartEndLessonDayNotFormedCallbackFactory):
-    week_date_str = (await state.get_data())['week_date']
-    week_date = give_date_format_fsm(week_date_str)
+# Но он не сформирован ❔ - спрашиваем сформировать или нет?
+@router.callback_query(StartEndLessonDayWillFormedCallbackFactory.filter())
+async def process_will_form_lesson(callback: CallbackQuery, session: AsyncSession,
+                                    callback_data: StartEndLessonDayWillFormedCallbackFactory):
+    await callback.message.edit_text(text=LEXICON_STUDENT['header_form_lesson'],
+                                     reply_markup=is_form_lesson_kb(callback_data.week_date,
+                                                                    callback_data.lesson_on,
+                                                                    callback_data.lesson_off))
+
+
+# На вопрос о формировании урока ответили - ДА
+@router.callback_query(StartEndLessonDayFormedCallbackFactory.filter())
+async def process_form_all_lessons_day(callback: CallbackQuery, session: AsyncSession, bot: Bot,
+                                       callback_data: StartEndLessonDayFormedCallbackFactory):
+
+    week_date = give_date_format_fsm(callback_data.week_date)
     lesson_on = give_time_format_fsm(callback_data.lesson_on)
     lesson_off = give_time_format_fsm(callback_data.lesson_off)
 
@@ -583,8 +594,55 @@ async def process_form_all_lessons_day(callback: CallbackQuery, session: AsyncSe
     # Все тоже самое, как в выводе информации об уроке
     student = await give_teacher_by_student_id(session,
                                                callback.from_user.id)
-    await callback.answer(text=LEXICON_STUDENT['formed_successfully'],
+
+    # Смотрим - придет ли уведомление учителю или нет. Если да, то отправляем
+    if student.teacher.daily_confirmation_notification and \
+       is_correct_sent_notification_lesson_for_teacher(student.teacher.daily_confirmation_notification,
+                                                       week_date):
+        await bot.send_message(chat_id=student.teacher.teacher_id,
+                               text=LEXICON_STUDENT['information_formed_lesson']
+                               .format(student.name, student.surname, week_date.strftime("%d.%m"),
+                                       give_week_day_by_week_date(week_date), lesson_on.strftime("%H:%M"),
+                                       lesson_off.strftime("%H:%M"))
+                               ,
+                               reply_markup=create_ok_show_day_schedule_student_kb(callback_data.week_date)
+                               )
+        text = LEXICON_STUDENT['formed_successfully_yes']
+    else:
+        text = LEXICON_STUDENT['formed_successfully_no']
+
+
+    # Сообщаем ученику придет уведомление или нет учителю
+    await callback.answer(text=text,
                           show_alert=True)
+
+    # Обновляем наше расписание, с учетом формирования занятия
+    all_lessons_for_day_not_ordered = (
+        await give_all_lessons_for_day(session,
+                                       week_date,
+                                       callback.from_user.id
+                                       )
+    ).all()
+
+    all_lessons_for_day_ordered_list = show_all_lessons_for_day(all_lessons_for_day_not_ordered)
+    await callback.message.edit_text(text=LEXICON_STUDENT['schedule_lesson_day']
+                                     .format(week_date.strftime("%d.%m"),
+                                             give_week_day_by_week_date(week_date)),
+                                     reply_markup=all_lessons_for_day_kb(all_lessons_for_day_ordered_list,
+                                                                         week_date)
+                                     )
+
+# На вопрос о формировании урока ответили - НЕТ
+@router.callback_query(StartEndLessonDayNotFormedCallbackFactory.filter())
+async def process_form_all_lessons_day(callback: CallbackQuery, session: AsyncSession,
+                                       callback_data: StartEndLessonDayNotFormedCallbackFactory):
+
+    week_date = give_date_format_fsm(callback_data.week_date)
+    lesson_on = give_time_format_fsm(callback_data.lesson_on)
+    lesson_off = give_time_format_fsm(callback_data.lesson_off)
+
+    student = await give_teacher_by_student_id(session,
+                                               callback.from_user.id)
 
     information_of_status_lesson = await give_information_of_lesson(session,
                                                                     callback.from_user.id,
@@ -605,11 +663,8 @@ async def process_form_all_lessons_day(callback: CallbackQuery, session: AsyncSe
 
     # Выводим информацию
     await callback.message.edit_text(text=text_information_lesson,
-                                     reply_markup=create_button_for_back_to_all_lessons_day(week_date_str,
-                                                                                            student,
-                                                                                            callback_data.lesson_on,
-                                                                                            callback_data.lesson_off,
-                                                                                            counter_lessons)
+                                     reply_markup=create_button_for_back_to_all_lessons_not_formed_day(
+                                         callback_data.week_date)
                                      )
 
 
@@ -657,7 +712,7 @@ async def process_show_full_information_lesson(callback: CallbackQuery, session:
 
 ##################### Отправляем сообщение преподавателю с ожиданием подтверждения оплаты ############################
 
-# Нажали __отправить__ из меню ученика
+# Нажали __Подтвердить__ из меню ученика
 @router.callback_query(InformationLessonCallbackFactory.filter(), IsNotAlreadyConfirmed())
 async def process_sent_student_payment_confirmation(callback: CallbackQuery, teacher_id: int, bot: Bot,
                                                     session: AsyncSession,
@@ -676,7 +731,8 @@ async def process_sent_student_payment_confirmation(callback: CallbackQuery, tea
                            reply_markup=create_confirm_payment_teacher_kb(callback.from_user.id,
                                                                           callback_data)
                            )
-    await callback.answer(text=LEXICON_STUDENT['student_payment_confirmation_good'])
+    await callback.answer(text=LEXICON_STUDENT['student_payment_confirmation_good'],
+                          show_alert = True)
 
 
 # Случай, когда оплата уже подтверждена
@@ -740,7 +796,7 @@ async def process_remove_lesson_student(callback: CallbackQuery, bot: Bot, sessi
 
         await callback.message.edit_text(text=LEXICON_STUDENT['schedule_lesson_day']
                                          .format(week_date_date.strftime("%d.%m"),
-                                                 give_week_day_by_week_date(week_date_date)),
+                                                 give_week_day_by_week_date(week_date_date).upper()),
                                          reply_markup=all_lessons_for_day_kb(all_lessons_for_day_ordered_list,
                                                                              week_date_date)
                                          )
@@ -755,7 +811,7 @@ async def process_remove_lesson_student(callback: CallbackQuery, bot: Bot, sessi
 
     ########## Отправляем информацию об удалении учителю в случае, если время удаления занятия находится в диапазоне дней,
     ########## когда учитель хочет получать информацию
-    if is_correct_sent_delete_lesson_for_teacher(student.teacher.days_cancellation_notification, week_date_date):
+    if is_correct_sent_notification_lesson_for_teacher(student.teacher.days_cancellation_notification, week_date_date):
         await bot.send_message(chat_id=student.teacher_id, text=LEXICON_STUDENT['student_cancellation_lesson']
                                .format(student.name, student.surname, week_date_date.strftime("%m.%d"),
                                        NUMERIC_DATE[date(year=week_date_date.year,
@@ -763,11 +819,18 @@ async def process_remove_lesson_student(callback: CallbackQuery, bot: Bot, sessi
                                                          day=week_date_date.day).isoweekday()],
                                        lesson_on_time.strftime("%H:%M"),
                                        lesson_off_time.strftime("%H:%M")),
-                               reply_markup=create_ok_remove_day_schedule_student_kb(
+                               reply_markup=create_ok_show_day_schedule_student_kb(
                                    callback_data.week_date
                                )
                                )
+        text = LEXICON_STUDENT['cancellation_yes']
+    else:
+        text = LEXICON_STUDENT['cancellation_no']
+
     await session.commit()
+
+    await callback.answer(text=text, show_alert=True)
+
 
 
 ###################################### Кнопка НАСТРОЙКИ #############################################

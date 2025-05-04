@@ -39,7 +39,7 @@ async def main():
     # Создаем асинхронный движок sqlalchemy
     engine = create_async_engine(url=config.tgbot.postgresql,
                                  echo=False)
-    #
+
     # async with engine.begin() as connection:
     #      await connection.run_sync(Base.metadata.drop_all)
     #      print("Удалил")

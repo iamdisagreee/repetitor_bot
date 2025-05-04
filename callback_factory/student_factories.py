@@ -40,7 +40,18 @@ class StartEndLessonDayCallbackFactory(CallbackData, prefix='start_end_lesson', 
     lesson_on: str
     lesson_off: str
 
-class StartEndLessonDayNotFormedCallbackFactory(CallbackData, prefix='lesson_formed', sep=';'):
+class StartEndLessonDayWillFormedCallbackFactory(CallbackData, prefix='will_formed', sep=';'):
+    week_date: str
+    lesson_on: str
+    lesson_off: str
+
+class StartEndLessonDayFormedCallbackFactory(CallbackData, prefix='lesson_formed', sep=';'):
+    week_date: str
+    lesson_on: str
+    lesson_off: str
+
+class StartEndLessonDayNotFormedCallbackFactory(CallbackData, prefix='lesson_not_formed', sep=';'):
+    week_date: str
     lesson_on: str
     lesson_off: str
 

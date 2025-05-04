@@ -139,22 +139,29 @@ def show_all_lessons_for_day(all_lessons_for_day):
                 'count_gaps': 1,
                 'count_is_formed': all_lessons_for_day[0].is_formed}
 
+    is_formed_last = all_lessons_for_day[0].is_formed
+
     for lesson in all_lessons_for_day[1:]:
         cur_start = lesson.lesson_start
         cur_finished = lesson.lesson_finished
         is_formed = lesson.is_formed
 
-        if cur_list['finished'] == cur_start:
+        # Условие, когда занятие не сформировано
+        if cur_list['finished'] == cur_start and not is_formed and not is_formed_last:
+            cur_list['finished'] = cur_finished
+            cur_list['count_gaps'] += 1
+        elif cur_list['finished'] == cur_start and is_formed and is_formed_last:
             cur_list['finished'] = cur_finished
             cur_list['count_gaps'] += 1
             cur_list['count_is_formed'] += is_formed
         else:
             result.append(cur_list)
+            is_formed_last = is_formed
             cur_list = {'start': cur_start,
                         'finished': cur_finished,
                         'count_gaps': 1,
                         'count_is_formed': is_formed}
-
+        # print(cur_list)
     result.append(cur_list)
     return result
 
@@ -180,117 +187,135 @@ def give_result_info(result_status):
 
 
 ############################################## УЧИТЕЛЬ #########################################3
-def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
-    # installed_lessons_week):
-    cur_buttons = []
-    empty_lessons = []
-    last_one = {'lesson_on': -1,
-                'lesson_off': -1,
-                'student_id': -1,
-                'list_status': [],
-                }
-
-    for interval in list_lessons_not_formatted:
-        # print(interval.work_start, interval.work_end)
-        # Случай, когда ученик не выбрал уроков вообще
-        if not interval.lessons:
-            cur_empty = {'lesson_on': interval.work_start,
-                         'lesson_off': interval.work_end,
-                         'student_id': None,
-                         'list_status': [-1]
-                         }
-            empty_lessons.append(cur_empty)
-        if interval.lessons:
-            lessons_sort = sorted(interval.lessons, key=lambda gap: gap.lesson_start)
-            if lessons_sort[0].lesson_start == last_one['lesson_off'] and \
-                    lessons_sort[0].student_id == last_one['student_id']:
-                cur_buttons.remove(last_one)
-                interval_result = {
-                    'lesson_on': last_one['lesson_on'],
-                    'lesson_off': lessons_sort[0].lesson_finished,
-                    'student_id': last_one['student_id'],
-                    'list_status': last_one['list_status']
-                }
-            else:
-                interval_result = {'lesson_on': lessons_sort[0].lesson_start,
-                                   'lesson_off': lessons_sort[0].lesson_finished,
-                                   'student_id': lessons_sort[0].student_id,
-                                   'list_status': [lessons_sort[0].status]
-                                   }
-
-            # Проверка на то, что занятия начинаются не с начала промежутка
-            if interval_result['lesson_on'] != interval.work_start:
-                cur_buttons.append(
-                    {'lesson_on': interval.work_start,
-                     'lesson_off': interval_result['lesson_on'],
-                     'student_id': None,
-                     'list_status': [-1]}
-                )
-
-            index = 1
-            while index < len(lessons_sort):
-                gap = lessons_sort[index]
-                if interval_result['lesson_off'] == gap.lesson_start:
-                    interval_result['lesson_off'] = gap.lesson_finished
-                    interval_result['list_status'].append(gap.status)
-                else:
-                    cur_buttons.append(interval_result)
-                    # Добавляем промежуток, который не выбран учениками
-                    cur_buttons.append(
-                        {
-                            'lesson_on': cur_buttons[-1]['lesson_off'],
-                            'lesson_off': gap.lesson_start,
-                            'student_id': None,
-                            'list_status': [-1]
-                        }
-                    )
-                    interval_result = {'lesson_on': gap.lesson_start,
-                                       'lesson_off': gap.lesson_finished,
-                                       'student_id': gap.student_id,
-                                       'list_status': [gap.status]}
-                index += 1
-
-            cur_buttons.append(interval_result)
-            # Проверка на остаток пустого промежутка
-            if interval_result['lesson_off'] != interval.work_end:
-                cur_buttons.append(
-                    {
-                        'lesson_on': interval_result['lesson_off'],
-                        'lesson_off': interval.work_end,
-                        'student_id': None,
-                        'list_status': [-1]
-                    }
-                )
-            last_one = interval_result
-
-    # Последний промежуток пустой, но уже есть занятия
-    if cur_buttons and len(empty_lessons) == 1:
-        cur_buttons.append(empty_lessons[-1])
-
-    # Ни одного занятого места
-    if not cur_buttons and empty_lessons:
-        start = empty_lessons[0]['lesson_on']
-        end = empty_lessons[0]['lesson_off']
-        for lesson in empty_lessons[1:]:
-            if lesson['lesson_on'] == end:
-                end = lesson['lesson_off']
-            else:
-                cur_buttons.append(
-                    {'lesson_on': start,
-                     'lesson_off': end,
-                     'student_id': None,
-                     'list_status': [-1]})
-                start = lesson['lesson_on']
-                end = lesson['lesson_off']
-        cur_buttons.append(
-            {'lesson_on': start,
-             'lesson_off': end,
-             'student_id': None,
-             'list_status': [-1]})
-    elif not cur_buttons and empty_lessons:
-        # Добавляем в начало пустой промежуток:
-        cur_buttons.insert(0, empty_lessons[0])
-    return cur_buttons
+# def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
+#     # installed_lessons_week):
+#     cur_buttons = []
+#     empty_lessons = []
+#     last_one = {'lesson_on': -1,
+#                 'lesson_off': -1,
+#                 'student_id': -1,
+#                 'list_status': [],
+#                 'price': -1,
+#                 }
+#
+#     for interval in list_lessons_not_formatted:
+#         # Случай, когда ученик не выбрал уроков вообще
+#         if not interval.lessons:
+#             cur_empty = {'lesson_on': interval.work_start,
+#                          'lesson_off': interval.work_end,
+#                          'student_id': None,
+#                          'list_status': [-1],
+#                          'price': -1,
+#                          }
+#             empty_lessons.append(cur_empty)
+#         if interval.lessons:
+#             lessons_sort = sorted(interval.lessons, key=lambda gap: gap.lesson_start)
+#             if lessons_sort[0].lesson_start == last_one['lesson_off'] and \
+#                     lessons_sort[0].student_id == last_one['student_id']:
+#                 cur_buttons.remove(last_one)
+#                 interval_result = {
+#                     'lesson_on': last_one['lesson_on'],
+#                     'lesson_off': lessons_sort[0].lesson_finished,
+#                     'student_id': last_one['student_id'],
+#                     'list_status': last_one['list_status'],
+#                     'price': lessons_sort[0].student.price,
+#                 }
+#             else:
+#                 interval_result = {'lesson_on': lessons_sort[0].lesson_start,
+#                                    'lesson_off': lessons_sort[0].lesson_finished,
+#                                    'student_id': lessons_sort[0].student_id,
+#                                    'list_status': [lessons_sort[0].status,],
+#                                    'price': lessons_sort[0].student.price,
+#                                    }
+#
+#             # Проверка на то, что занятия начинаются не с начала промежутка
+#             if interval_result['lesson_on'] != interval.work_start:
+#                 cur_buttons.append(
+#                     {'lesson_on': interval.work_start,
+#                      'lesson_off': interval_result['lesson_on'],
+#                      'student_id': None,
+#                      'list_status': [-1],
+#                      'price': interval_result['price']
+#                      }
+#                 )
+#
+#             is_formed_last = True if lessons_sort[0].is_formed else False
+#
+#             index = 1
+#             while index < len(lessons_sort):
+#                 gap = lessons_sort[index]
+#                 if interval_result['lesson_off'] == gap.lesson_start and not gap.is_formed  \
+#                         and not is_formed_last:
+#                     interval_result['lesson_off'] = gap.lesson_finished
+#                     interval_result['list_status'] = [-1]
+#                 if interval_result['lesson_off'] == gap.lesson_start and gap.is_formed\
+#                         and is_formed_last:
+#                     interval_result['lesson_off'] = gap.lesson_finished
+#                     interval_result['list_status'].append(gap.status)
+#                 else:
+#                     cur_buttons.append(interval_result)
+#                     # Добавляем промежуток, который не выбран учениками
+#                     cur_buttons.append(
+#                         {
+#                             'lesson_on': cur_buttons[-1]['lesson_off'],
+#                             'lesson_off': gap.lesson_start,
+#                             'student_id': None,
+#                             'list_status': [-1],
+#                             'price': gap.student.price
+#                         }
+#                     )
+#                     interval_result = {'lesson_on': gap.lesson_start,
+#                                        'lesson_off': gap.lesson_finished,
+#                                        'student_id': gap.student_id,
+#                                        'list_status': [gap.status],
+#                                        'price': gap.student.price}
+#                 index += 1
+#
+#             cur_buttons.append(interval_result)
+#             # Проверка на остаток пустого промежутка
+#             if interval_result['lesson_off'] != interval.work_end:
+#                 cur_buttons.append(
+#                     {
+#                         'lesson_on': interval_result['lesson_off'],
+#                         'lesson_off': interval.work_end,
+#                         'student_id': None,
+#                         'list_status': [-1],
+#                         'price': interval_result['price']
+#                     }
+#                 )
+#             last_one = interval_result
+#
+#     # Последний промежуток пустой, но уже есть занятия
+#     if cur_buttons and len(empty_lessons) == 1:
+#         cur_buttons.append(empty_lessons[-1])
+#
+#     # Ни одного занятого места
+#     if not cur_buttons and empty_lessons:
+#         start = empty_lessons[0]['lesson_on']
+#         end = empty_lessons[0]['lesson_off']
+#         price = empty_lessons[0]['price']
+#         for lesson in empty_lessons[1:]:
+#             if lesson['lesson_on'] == end:
+#                 end = lesson['lesson_off']
+#             else:
+#                 cur_buttons.append(
+#                     {'lesson_on': start,
+#                      'lesson_off': end,
+#                      'student_id': None,
+#                      'list_status': [-1],
+#                      'price': price})
+#                 start = lesson['lesson_on']
+#                 end = lesson['lesson_off']
+#         cur_buttons.append(
+#             {'lesson_on': start,
+#              'lesson_off': end,
+#              'student_id': None,
+#              'list_status': [-1],
+#              'price': price})
+#     elif not cur_buttons and empty_lessons:
+#         # Добавляем в начало пустой промежуток:
+#         cur_buttons.insert(0, empty_lessons[0])
+#     return cur_buttons
 
 
 # Время до пенальти
@@ -385,12 +410,12 @@ def create_list_gaps_by_time_on_and_off(week_date: date,
 
     return list_gaps_time
 
-
-def is_correct_sent_delete_lesson_for_teacher(days_cancellation_notification: int,
-                                              week_date_date):
-    return days_cancellation_notification and datetime.now() \
-        + timedelta(days=days_cancellation_notification - 1) >= \
-        datetime(year=week_date_date.year, month=week_date_date.month, day=week_date_date.day)
+# Добавилось / удалилось занятие
+def is_correct_sent_notification_lesson_for_teacher(days: int,
+                                                    week_date):
+    return days and datetime.now() \
+        + timedelta(days=days - 1) >= \
+        datetime(year=week_date.year, month=week_date.month, day=week_date.day)
 
 
 # Создаем таску с предварительной проверкой, что она не создана

@@ -30,6 +30,9 @@ class FSMSetDailyScheduleMailing(StatesGroup):
 class FSMSetDailyReportMailing(StatesGroup):
     fill_daily_report_mailing_time = State()
 
+class FSMSetDailyConfirmationNotification(StatesGroup):
+    fill_daily_confirmation_notification = State()
+
 class FSMSetCancellationNotificationTeacher(StatesGroup):
     fill_cancellation_notification = State()
 
