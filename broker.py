@@ -22,10 +22,3 @@ taskiq_aiogram.init(
     "main:bot",
     # You can specify more bots here.
 )
-
-@worker.on_event(TaskiqEvents.WORKER_STARTUP)
-async def startup(state: TaskiqState) -> None:
-    config = load_config()
-    engine = create_async_engine(url=config.tgbot.postgresql,
-                                 echo=False)
-    state.session_pool = async_sessionmaker(engine)

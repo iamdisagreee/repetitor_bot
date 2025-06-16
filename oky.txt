@@ -1,0 +1,30 @@
+def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
+	result_lessons = []
+	for interval in list_lessons_not_formatted"
+		if not interval.lessons:
+			result_lessons.append(
+				{
+					'lesson_on': interval.work_start,
+					'lesson_off': interval.work_end,
+					'student': None,
+					'status': None,
+					'price': None
+				}
+			)
+		cur_result = {}
+		for lesson in interval.lessons:
+			if not lesson.is_formed:
+				cur_result = {
+					'lesson_on': lesson.lesson_start,
+					'lesson_off': lesson.lesson_finished,
+					'student': None,
+					'status': None,
+					'price': None
+				}
+			elif not cur_result:
+				cur_result = {
+					'lesson_on': lesson.lesson_start,
+					'lesson_off': lesson.lesson_finished,
+					'student': lesson.student.name
+				}
+				

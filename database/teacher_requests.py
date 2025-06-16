@@ -2,7 +2,7 @@ from datetime import datetime, date, time
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, delete
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import selectinload, joinedload
 
 from database import LessonDay, Student, AccessStudent, Debtor
 from database.models import Penalty
@@ -140,8 +140,9 @@ async def give_all_lessons_day_by_week_day(session: AsyncSession,
                 LessonWeek.week_date == week_date
             )
         )
-        .order_by(LessonWeek.work_start)
-        .options(selectinload(LessonWeek.lessons).selectinload(LessonDay.student))
+        .order_by(LessonWeek.work_start, LessonDay.lesson_start)
+        .options(joinedload(LessonWeek.lessons).joinedload(LessonDay.student),
+                 selectinload(LessonWeek.teacher))
     )
 
     result = await session.execute(stmt)
