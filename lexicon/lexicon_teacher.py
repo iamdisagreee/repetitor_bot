@@ -234,7 +234,7 @@ LEXICON_TEACHER = {
     'next_seven_days_schedule_teacher_kb': '🎓{} - {}🎓',
     'schedule_lesson_day': '📌📌 <b>{} - {}</b> 📌📌\n\n'
                            '🔍 Нажмите на <b><i>кнопку</i></b> — узнайте все детали! 🔍',
-    'text_schedule_lesson_day': '{}{} - {}',
+    'text_schedule_lesson_day': '{} {} - {}',
     'paid': '✅',
     'not_paid': '❌',
     'not_reserved': '❔',

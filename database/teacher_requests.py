@@ -2,7 +2,7 @@ from datetime import datetime, date, time
 from uuid import UUID
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, and_, delete
-from sqlalchemy.orm import selectinload, joinedload
+from sqlalchemy.orm import selectinload, joinedload, contains_eager
 
 from database import LessonDay, Student, AccessStudent, Debtor
 from database.models import Penalty
@@ -132,22 +132,24 @@ async def delete_week_day(session: AsyncSession,
 async def give_all_lessons_day_by_week_day(session: AsyncSession,
                                            teacher_id: int,
                                            week_date: date):
+
     stmt = (
         select(LessonWeek)
+        .join(LessonWeek.lessons)
         .where(
             and_(
                 LessonWeek.teacher_id == teacher_id,
                 LessonWeek.week_date == week_date
             )
         )
-        .order_by(LessonWeek.work_start, LessonDay.lesson_start)
-        .options(joinedload(LessonWeek.lessons).joinedload(LessonDay.student),
+        .options(contains_eager(LessonWeek.lessons).joinedload(LessonDay.student),
                  selectinload(LessonWeek.teacher))
+        .order_by(LessonWeek.work_start, LessonDay.lesson_start)
     )
 
     result = await session.execute(stmt)
 
-    return result.scalars()
+    return result.unique().scalars()
 
 
 async def give_student_by_student_id(session: AsyncSession,
