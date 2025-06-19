@@ -271,7 +271,6 @@ class IsSomethingToShowSchedule(BaseFilter):
                                                         week_date)
 
         found_lessons_week = result.all()
-
         if found_lessons_week:
             return {'list_lessons_not_formatted': found_lessons_week,
                     'week_date_str': week_date_str}

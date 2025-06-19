@@ -394,7 +394,6 @@ async def process_show_status_student(callback: CallbackQuery, session: AsyncSes
 # Проверяем на условие пенальти:
 # ❌ -> ✅ - проверяем на пенальти/баним (если указано время)
 # ✅ -> ❌ - не проверяем на пенальти (случайные клики)
-# НАДО ДОБАВИТЬ МЕНЮ???
 @router.callback_query(EditStatusPayCallbackFactory.filter())
 async def process_edit_status_student(callback: CallbackQuery, session: AsyncSession,
                                       callback_data: EditStatusPayCallbackFactory):

@@ -319,6 +319,7 @@ def give_result_info(result_status):
 def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
     # Первичная обработка временных интервалов
     intermediate_work = []
+    index = -1
     for interval in list_lessons_not_formatted:
         if not interval.lessons:
             intermediate_work.append(
@@ -330,19 +331,12 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
                     'price': None
                 }
             )
+            index += 1
             continue
 
-        cur_lesson = {}
         for lesson in interval.lessons:
-            if not lesson.is_formed:
-                cur_lesson = {
-                    'lesson_on': lesson.lesson_start,
-                    'lesson_off': lesson.lesson_finished,
-                    'student': None,
-                    'status': None,
-                    'price': None
-                }
-            else:
+
+            if lesson.is_formed:
                 cur_lesson = {
                     'lesson_on': lesson.lesson_start,
                     'lesson_off': lesson.lesson_finished,
@@ -350,43 +344,90 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
                     'status': lesson.status,
                     'price': lesson.student.price / 2
                 }
+            else:
+                cur_lesson = {
+                    'lesson_on': lesson.lesson_start,
+                    'lesson_off': lesson.lesson_finished,
+                    'student': None,
+                    'status': None,
+                    'price': None
+                }
+
+            if index == -1 and cur_lesson['lesson_on'] != interval.work_start:
+                intermediate_work.append(
+                    {
+                        'lesson_on': interval.work_start,
+                        'lesson_off': cur_lesson['lesson_on'],
+                        'student': None,
+                        'status': None,
+                        'price': None
+                    }
+                )
+
+                index += 1
+
+
+            elif index > 0 and intermediate_work[index]['lesson_off'] != cur_lesson['lesson_on']:
+                # print(index, intermediate_work[index]   )
+                intermediate_work.append(
+                    {
+                        'lesson_on': intermediate_work[index]['lesson_off'],
+                        'lesson_off': cur_lesson['lesson_on'],
+                        'student': None,
+                        'status': None,
+                        'price': None
+                    }
+                )
+
+                index += 1
+
             intermediate_work.append(cur_lesson)
+            index += 1
 
-        intermediate_work.append(cur_lesson)
 
+
+        if intermediate_work[index]['lesson_off'] != interval.work_end:
+            intermediate_work.append(
+                {
+                    'lesson_on': intermediate_work[index]['lesson_off'],
+                    'lesson_off': interval.work_end,
+                    'student': None,
+                    'status': None,
+                    'price': None
+                }
+            )
+            index += 1
     # Вторичная обработка - формируем временные промежутки
     result_work = []
-    last_lesson = intermediate_work[0]
-
-    for cur_lesson in intermediate_work[1:]:
-        if last_lesson['student'] is None:
-            if cur_lesson['student'] is None:
-                last_lesson['lesson_off'] = cur_lesson['lesson_off']
-                # if last_lesson['lesson_off'] == cur_lesson['lesson_on']:
-                #     last_lesson['lesson_off'] = cur_lesson['lesson_off']
-                # else:
-                #     result_work.append(last_lesson)
-                #     last_lesson = cur_lesson
+    if len(intermediate_work) == 0:
+        return result_work
+    elif len(intermediate_work) == 1:
+        return intermediate_work
+    else:
+        last_lesson = intermediate_work[0]
+        for cur_lesson in intermediate_work[1:]:
+            if last_lesson['student'] is None:
+                if cur_lesson['student'] is None:
+                    last_lesson['lesson_off'] = cur_lesson['lesson_off']
+                else:
+                    result_work.append(last_lesson)
+                    last_lesson = cur_lesson
             else:
-                result_work.append(last_lesson)
-                last_lesson = cur_lesson
-        else:
-            if cur_lesson['student'] is not None:
-                if last_lesson['student'] == cur_lesson['student']:
-                    if last_lesson['lesson_off'] == cur_lesson['lesson_on']:
-                        last_lesson['lesson_off'] = cur_lesson['lesson_off']
-                        last_lesson['price'] *= 2
-                        last_lesson['status'] &= cur_lesson['status']
+                if cur_lesson['student'] is not None:
+                    if last_lesson['student'] == cur_lesson['student']:
+                        if last_lesson['lesson_off'] == cur_lesson['lesson_on']:
+                            last_lesson['lesson_off'] = cur_lesson['lesson_off']
+                            last_lesson['price'] += cur_lesson['price']
+                            last_lesson['status'] &= cur_lesson['status']
+                        else:
+                            result_work.append(last_lesson)
+                            last_lesson = cur_lesson
                     else:
                         result_work.append(last_lesson)
                         last_lesson = cur_lesson
                 else:
                     result_work.append(last_lesson)
                     last_lesson = cur_lesson
-            else:
-                result_work.append(last_lesson)
-                last_lesson = cur_lesson
-
     result_work.append(last_lesson)
     return result_work
 

@@ -36,4 +36,5 @@ class LessonWeek(Base):
     teacher: Mapped["teacher.Teacher"] = relationship(back_populates='weeks',
                                                       )
     lessons: Mapped[list["lesson_day.LessonDay"]] = relationship(back_populates='week',
-                                                                 cascade='delete')
+                                                                 cascade='delete',
+                                                                 order_by="LessonDay.lesson_start")

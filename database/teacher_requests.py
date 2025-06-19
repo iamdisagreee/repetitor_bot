@@ -132,23 +132,20 @@ async def delete_week_day(session: AsyncSession,
 async def give_all_lessons_day_by_week_day(session: AsyncSession,
                                            teacher_id: int,
                                            week_date: date):
-
     stmt = (
         select(LessonWeek)
-        .join(LessonWeek.lessons)
         .where(
             and_(
                 LessonWeek.teacher_id == teacher_id,
                 LessonWeek.week_date == week_date
             )
         )
-        .options(contains_eager(LessonWeek.lessons).joinedload(LessonDay.student),
+        .options(selectinload(LessonWeek.lessons).selectinload(LessonDay.student),
                  selectinload(LessonWeek.teacher))
-        .order_by(LessonWeek.work_start, LessonDay.lesson_start)
+        .order_by(LessonWeek.work_start)
     )
 
     result = await session.execute(stmt)
-
     return result.unique().scalars()
 
 
@@ -186,31 +183,43 @@ async def change_status_pay_student(session: AsyncSession,
                                     week_date: date,
                                     lesson_on: time,
                                     lesson_off: time):
-    lesson_days = await session.execute(
-        select(LessonDay)
-        .where(
-            and_(
-                LessonDay.student_id == student_id,
-                LessonDay.week_date == week_date,
-                LessonDay.lesson_start >= lesson_on,
-                LessonDay.lesson_finished <= lesson_off
+    lesson_days = (
+        await session.scalars(
+            select(LessonDay)
+            .where(
+                and_(
+                    LessonDay.student_id == student_id,
+                    LessonDay.week_date == week_date,
+                    LessonDay.lesson_start >= lesson_on,
+                    LessonDay.lesson_finished <= lesson_off
+                )
             )
+            .order_by(LessonDay.lesson_start)
         )
-        .order_by(LessonDay.lesson_start)
-    )
-    status = False
-    list_lessons = {}
-    for lesson_day in lesson_days.scalars():
-        list_lessons[lesson_day] = lesson_day.status
+    ).all()
 
-    if sum(list_lessons.values()) != len(list_lessons) and sum(list_lessons.values()) > 0:
-        for lesson_day_u in list_lessons.keys():
-            lesson_day_u.status = False
+    # print(x.lesson_start for x in lesson_days)
+    status = True
+    count_true = sum(lesson_day.status for lesson_day in lesson_days)
+    if count_true == len(lesson_days):
+        for lesson_day in lesson_days:
+            lesson_day.status = False
     else:
-        for lesson_day_u in list_lessons.keys():
-            if status or not lesson_day_u.status:
-                status = True
-            lesson_day_u.status = not lesson_day_u.status
+        for lesson_day in lesson_days:
+            lesson_day.status = True
+
+    # list_lessons = {}
+    # for lesson_day in lesson_days.scalars():
+    #     list_lessons[lesson_day] = lesson_day.status
+    #
+    # if sum(list_lessons.values()) != len(list_lessons) and sum(list_lessons.values()) > 0:
+    #     for lesson_day_u in list_lessons.keys():
+    #         lesson_day_u.status = False
+    # else:
+    #     for lesson_day_u in list_lessons.keys():
+    #         if status or not lesson_day_u.status:
+    #             status = True
+    #         lesson_day_u.status = True
     await session.commit()
 
     return status
@@ -410,6 +419,7 @@ async def give_student_by_teacher_id_debtors(session: AsyncSession,
     )
     return student.scalar()
 
+
 # Удаляем все занятия ученика
 async def delete_all_lessons_student(session: AsyncSession,
                                      student_id: int):
@@ -470,6 +480,7 @@ async def remove_debtor_from_list_by_id(session: AsyncSession,
     )
     await session.commit()
 
+
 async def remove_debtor_from_list_by_info(session: AsyncSession,
                                           student_id: int,
                                           week_date: date,
@@ -501,6 +512,7 @@ async def remove_debtor_from_list_by_info(session: AsyncSession,
     )
     await session.commit()
 
+
 async def update_until_time_notification_teacher(session: AsyncSession,
                                                  teacher_id: int,
                                                  until_hour_notification,
@@ -513,6 +525,7 @@ async def update_until_time_notification_teacher(session: AsyncSession,
     teacher.until_minute_notification = until_minute_notification
     await session.commit()
 
+
 async def update_daily_schedule_mailing_teacher(session: AsyncSession,
                                                 teacher_id: int,
                                                 daily_schedule_mailing_time: time
@@ -524,16 +537,18 @@ async def update_daily_schedule_mailing_teacher(session: AsyncSession,
     teacher.daily_schedule_mailing_time = daily_schedule_mailing_time
     await session.commit()
 
+
 async def update_daily_report_mailing_teacher(session: AsyncSession,
-                                                teacher_id: int,
-                                                daily_report_mailing_time: time
-                                                ):
+                                              teacher_id: int,
+                                              daily_report_mailing_time: time
+                                              ):
     teacher = (await session.execute(
         select(Teacher)
         .where(Teacher.teacher_id == teacher_id)
     )).scalar()
     teacher.daily_report_mailing_time = daily_report_mailing_time
     await session.commit()
+
 
 async def update_days_confirmation_notification(session: AsyncSession,
                                                 teacher_id: int,
@@ -545,9 +560,10 @@ async def update_days_confirmation_notification(session: AsyncSession,
     teacher.days_confirmation_notification = days_confirmation_notification
     await session.commit()
 
+
 async def update_days_cancellation_teacher(session: AsyncSession,
                                            teacher_id: int,
-                                            days_cancellation_notification: int):
+                                           days_cancellation_notification: int):
     teacher = (await session.execute(
         select(Teacher)
         .where(Teacher.teacher_id == teacher_id)

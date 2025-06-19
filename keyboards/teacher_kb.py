@@ -214,62 +214,24 @@ def create_all_records_week_day(weeks_day,
 
 
 # Отображаем статусы занятий за день
-async def show_status_lesson_day_kb(cur_buttons,
-                                    session: AsyncSession,
-                                    week_date_str: str):
-    builder = InlineKeyboardBuilder()
-    res_buttons = []
-
-    for button in cur_buttons:
-        # Случай, когда кнопка пустая
-        if button['student_id'] is None:
-            continue
-        student = await give_student_by_student_id(session, button['student_id'])
-        price = student.price / 2 * len(button['list_status'])
-        status = '✅' if len(button['list_status']) == sum(button['list_status']) else '❌'
-        res_buttons.append(
-            InlineKeyboardButton(
-                text=LEXICON_TEACHER['status_lesson_day_kb'].format(
-                    status, student.name, button['lesson_on'].strftime("%H:%M"),
-                    button['lesson_off'].strftime("%H:%M"), price),
-                callback_data=EditStatusPayCallbackFactory(
-                    lesson_on=button['lesson_on'].strftime("%H:%M"),
-                    lesson_off=button['lesson_off'].strftime("%H:%M"),
-                    week_date=week_date_str,
-                ).pack()
-            )
-        )
-    res_buttons.append(InlineKeyboardButton(text=LEXICON_TEACHER['back'],
-                             callback_data=ShowNextSevenDaysCallbackFactory(
-                                 week_date=week_date_str
-                             ).pack()
-                             )
-                       )
-    res_buttons.append(
-                InlineKeyboardButton(text=LEXICON_TEACHER['home'],
-                             callback_data='auth_teacher')
-    )
-
-    builder.row(*res_buttons[:-2], width=1)
-    builder.row(*res_buttons[-2:], width=2)
-
-    return builder.as_markup()
-
-# async def show_status_lesson_day_kb(buttons,
+# async def show_status_lesson_day_kb(cur_buttons,
 #                                     session: AsyncSession,
 #                                     week_date_str: str):
 #     builder = InlineKeyboardBuilder()
 #     res_buttons = []
 #
-#     for button in buttons:
-#         if button['student'] is None:
+#     for button in cur_buttons:
+#         # Случай, когда кнопка пустая
+#         if button['student_id'] is None:
 #             continue
-#
+#         student = await give_student_by_student_id(session, button['student_id'])
+#         price = student.price / 2 * len(button['list_status'])
+#         status = '✅' if len(button['list_status']) == sum(button['list_status']) else '❌'
 #         res_buttons.append(
 #             InlineKeyboardButton(
 #                 text=LEXICON_TEACHER['status_lesson_day_kb'].format(
-#                     button['status']['❌', '✅'], button['student'], button['lesson_on'].strftime("%H:%M"),
-#                     button['lesson_off'].strftime("%H:%M"), button['price']),
+#                     status, student.name, button['lesson_on'].strftime("%H:%M"),
+#                     button['lesson_off'].strftime("%H:%M"), price),
 #                 callback_data=EditStatusPayCallbackFactory(
 #                     lesson_on=button['lesson_on'].strftime("%H:%M"),
 #                     lesson_off=button['lesson_off'].strftime("%H:%M"),
@@ -277,7 +239,6 @@ async def show_status_lesson_day_kb(cur_buttons,
 #                 ).pack()
 #             )
 #         )
-#
 #     res_buttons.append(InlineKeyboardButton(text=LEXICON_TEACHER['back'],
 #                              callback_data=ShowNextSevenDaysCallbackFactory(
 #                                  week_date=week_date_str
@@ -293,6 +254,45 @@ async def show_status_lesson_day_kb(cur_buttons,
 #     builder.row(*res_buttons[-2:], width=2)
 #
 #     return builder.as_markup()
+
+async def show_status_lesson_day_kb(buttons,
+                                    session: AsyncSession,
+                                    week_date_str: str):
+    builder = InlineKeyboardBuilder()
+    res_buttons = []
+
+    for button in buttons:
+        if button['student'] is None:
+            continue
+
+        res_buttons.append(
+            InlineKeyboardButton(
+                text=LEXICON_TEACHER['status_lesson_day_kb'].format(
+                    ['❌', '✅'][button['status']], button['student'], button['lesson_on'].strftime("%H:%M"),
+                    button['lesson_off'].strftime("%H:%M"), button['price']),
+                callback_data=EditStatusPayCallbackFactory(
+                    lesson_on=button['lesson_on'].strftime("%H:%M"),
+                    lesson_off=button['lesson_off'].strftime("%H:%M"),
+                    week_date=week_date_str,
+                ).pack()
+            )
+        )
+
+    res_buttons.append(InlineKeyboardButton(text=LEXICON_TEACHER['back'],
+                             callback_data=ShowNextSevenDaysCallbackFactory(
+                                 week_date=week_date_str
+                             ).pack()
+                             )
+                       )
+    res_buttons.append(
+                InlineKeyboardButton(text=LEXICON_TEACHER['home'],
+                             callback_data='auth_teacher')
+    )
+
+    builder.row(*res_buttons[:-2], width=1)
+    builder.row(*res_buttons[-2:], width=2)
+
+    return builder.as_markup()
 
 #
 # def show_schedule_lesson_day_kb(cur_buttons,
@@ -349,7 +349,7 @@ def show_schedule_lesson_day_kb(buttons,
     res_buttons = []
 
     for button in buttons:
-        print(button)
+        # print(button)
         if button['student'] is not None:
             status = ['❌', '✅'][button['status']]
             callback_data = ShowInfoDayCallbackFactory(
