@@ -397,6 +397,9 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
                 }
             )
             index += 1
+
+    # for el in intermediate_work:
+    #     print(el)
     # Вторичная обработка - формируем временные промежутки
     result_work = []
     if len(intermediate_work) == 0:
@@ -408,7 +411,11 @@ def show_intermediate_information_lesson_day_status(list_lessons_not_formatted):
         for cur_lesson in intermediate_work[1:]:
             if last_lesson['student'] is None:
                 if cur_lesson['student'] is None:
-                    last_lesson['lesson_off'] = cur_lesson['lesson_off']
+                    if last_lesson['lesson_off'] == cur_lesson['lesson_on']:
+                        last_lesson['lesson_off'] = cur_lesson['lesson_off']
+                    else:
+                        result_work.append(last_lesson)
+                        last_lesson = cur_lesson
                 else:
                     result_work.append(last_lesson)
                     last_lesson = cur_lesson
