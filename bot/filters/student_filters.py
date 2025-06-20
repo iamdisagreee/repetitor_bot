@@ -98,7 +98,7 @@ class IsMoveRightAddMenu(BaseFilter):
                 break
 
         page_now = state_dict['page']
-        print(page_now, page_count)
+        # print(page_now, page_count)
         if page_now + 1 < page_count:
             return {'dict_lessons': dict_lessons,
                     'student': student,

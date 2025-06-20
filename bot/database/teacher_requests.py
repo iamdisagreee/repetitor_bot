@@ -335,7 +335,7 @@ async def give_status_entry_student(session: AsyncSession,
             .where(AccessStudent.student_id == student_id)
         )
     ).scalar()
-    print(student_status)
+    # print(student_status)
     return student_status
 
 
@@ -486,7 +486,7 @@ async def remove_debtor_from_list_by_info(session: AsyncSession,
                                           week_date: date,
                                           lesson_on: time,
                                           lesson_off: time):
-    print(week_date)
+    # print(week_date)
     x = (await session.execute(
         select(Debtor)
         .where(
@@ -495,10 +495,10 @@ async def remove_debtor_from_list_by_info(session: AsyncSession,
             )
         )
     )).scalar()
-    print(x.student_id,
-          x.lesson_on,
-          x.week_date)
-    print(x)
+    # print(x.student_id,
+    #       x.lesson_on,
+    #       x.week_date)
+    # print(x)
     await session.execute(
         delete(Debtor)
         .where(

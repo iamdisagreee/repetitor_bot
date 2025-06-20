@@ -518,7 +518,7 @@ def create_confirm_payment_teacher_kb(student_id: int,
 
 def create_confirm_payment_teacher_by_debtor_kb(student_id: int,
                                       callback_data: InformationLessonWithDeleteCallbackFactory):
-    print('Попал в клавиатуру')
+    # print('Попал в клавиатуру')
     confirm_payment_teacher_kb = InlineKeyboardMarkup(
         inline_keyboard=[
             [InlineKeyboardButton(

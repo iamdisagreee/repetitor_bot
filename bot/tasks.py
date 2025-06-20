@@ -45,7 +45,7 @@ async def daily_newsletter_teacher(teacher_id: int,
                                    text),
                            reply_markup=create_confirmation_day_teacher_kb()
                            )
-    print('Сообщение отправлено преподавателю!')
+    # print('Сообщение отправлено преподавателю!')
     # Добавляем учеников в таблицу должников
     async with context.state.session_pool() as session:
         for lesson in result_debtors:
@@ -91,7 +91,7 @@ async def daily_newsletter_teacher(teacher_id: int,
         except TelegramRetryAfter as e:
             await asyncio.sleep(float(e.retry_after))
             continue
-    print('Рассылка для учеников окончена!')
+    # print('Рассылка для учеников окончена!')
 
 
 # Высылаем расписание каждый день в __переданное время__ для учителя
@@ -232,13 +232,13 @@ async def notice_lesson_certain_time_student(student_id: int,
                                              bot: Bot = TaskiqDepends()):
     dt_res = datetime(year=week_date.year, month=week_date.month, day=week_date.day,
                       hour=lesson_start.hour, minute=lesson_start.minute)
-    print("Отправил сообщение")
+    # print("Отправил сообщение")
     await bot.send_message(chat_id=student_id, text=LEXICON_TASKIQ['time_before_lesson_student']
     .format(*time_before_lesson, dt_res.strftime("%m.%d %H:%M")),
                            reply_markup=create_notice_lesson_certain_time_student_ok()
                            )
 
-    print("ПОМЕНЯЛ СТАТУС")
+    # print("ПОМЕНЯЛ СТАТУС")
     # меняем статус - уведомление отправили
     async with context.state.session_pool() as session:
         await change_student_mailing_status(session=session,
@@ -365,8 +365,8 @@ async def teacher_mailing_lessons(context: Context = TaskiqDepends(),
                                                         )
 
         await session.commit()
-    for x in await scheduler_storage.get_schedules():
-        print(x)
+    # for x in await scheduler_storage.get_schedules():
+        # print(x)
     await scheduler_storage.shutdown()
 
 @worker.task(task_name='notice_lesson_certain_time_teacher')
@@ -380,12 +380,12 @@ async def notice_lesson_certain_time_teacher(teacher_id: int,
 
     dt_res = datetime(year=week_date.year, month=week_date.month, day=week_date.day,
                       hour=lesson_start.hour, minute=lesson_start.minute)
-    print("Отправил сообщение")
+    # print("Отправил сообщение")
 
     await bot.send_message(chat_id=teacher_id, text=LEXICON_TASKIQ['time_before_lesson_teacher']
                            .format(*student_info, *time_before_lesson, dt_res.strftime("%m.%d %H:%M")),
                            reply_markup=create_notice_lesson_certain_time_teacher_ok())
-    print("ПОМЕНЯЛ СТАТУС")
+    # print("ПОМЕНЯЛ СТАТУС")
 
     async with context.state.session_pool() as session:
         await change_teacher_mailing_status(session,
