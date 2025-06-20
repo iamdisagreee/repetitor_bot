@@ -14,8 +14,7 @@ from aiogram.fsm.storage.redis import RedisStorage
 from bot.handlers import other_handlers, teacher_handlers, everyone_handlers, student_handlers
 from bot.keyboards.everyone_kb import set_new_menu
 from bot.middlewares.outer import DbSessionMiddleware
-
-# from tasks import scheduled_payment_verification
+from bot.services.services import create_scheduled_task_handler
 
 config = load_config()
 
@@ -42,20 +41,6 @@ async def main():
     await set_new_menu(bot)
 
     session_maker = async_sessionmaker(engine)
-    # async with session_maker() as session:
-    #     await remove_debtor_from_list_by_info(session,
-    #                                           student_id=859717714,
-    #                                           week_date=date.today(),
-    #                                           lesson_on=time(0, 8),
-    #                                           lesson_off=time(1, 8))
-    #     debtor = Debtor(teacher_id=7880267101,
-    #                     student_id=859717714,
-    #                     week_date=date(2025, 4, 2),
-    #                     lesson_on=time(11,30),
-    #                     lesson_off=time(12, 30),
-    #                     amount_money=1000)
-    #     session.add(debtor)
-    #     await session.commit()
 
     dp.include_router(everyone_handlers.router)
     dp.include_router(student_handlers.router)
@@ -66,13 +51,12 @@ async def main():
 
     await worker.startup()
     await scheduler_storage.startup()
-    # await delete_all_schedules_teacher(7880267101)
-    # await create_scheduled_task_handler(task_name='student_mailing_lessons',
-    #                                     schedule_id='student_mailing_lessons',
-    #                                     cron='*/5 * * * *')
-    # await create_scheduled_task_handler(task_name='teacher_mailing_lessons',
-    #                                     schedule_id='teacher_mailing_status',
-    #                                     cron='*/5 * * * *')
+    await create_scheduled_task_handler(task_name='student_mailing_lessons',
+                                        schedule_id='student_mailing_lessons',
+                                        cron='*/2 * * * *')
+    await create_scheduled_task_handler(task_name='teacher_mailing_lessons',
+                                        schedule_id='teacher_mailing_status',
+                                        cron='*/2 * * * *')
 
     await bot.delete_webhook(drop_pending_updates=True)
     await dp.start_polling(

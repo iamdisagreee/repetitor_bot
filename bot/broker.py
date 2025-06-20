@@ -1,5 +1,6 @@
 import taskiq_aiogram
-from taskiq import TaskiqScheduler
+from sqlalchemy.ext.asyncio import create_async_engine, async_sessionmaker
+from taskiq import TaskiqScheduler, TaskiqEvents, TaskiqState
 from taskiq_nats import PullBasedJetStreamBroker, NATSObjectStoreResultBackend, NATSKeyValueScheduleSource
 
 from bot.config_data.config_data import load_config
@@ -22,3 +23,11 @@ taskiq_aiogram.init(
     "bot.main:bot",
     # You can specify more bots here.
 )
+
+
+@worker.on_event(TaskiqEvents.WORKER_STARTUP)
+async def startup(state: TaskiqState) -> None:
+    config = load_config()
+    engine = create_async_engine(url=config.postgres.token,
+                                 echo=False)
+    state.session_pool = async_sessionmaker(engine)

@@ -50,7 +50,7 @@ def give_data_config_teacher(teacher: Teacher):
                                         'lesson_on': lesson.lesson_start,
                                         'lesson_off': lesson.lesson_finished,
                                         'amount_money': student.price / 2}
-                    general_information['amount_money_no'] += student.price / 2
+                general_information['amount_money_no'] += student.price / 2
 
             general_information['amount_time'] += 30
         if dict_debtors:
@@ -181,7 +181,7 @@ async def create_scheduled_task(task_name: str,
                          cron_offset=cron_offset,
                          time=result_sent_time + timedelta(seconds=5),
                          )
-    print(f'Будет отправлено в {result_sent_time}')
+    # print(f'Будет отправлено в {result_sent_time}')
     await scheduler_storage.add_schedule(task)
 
 # Возвращаем словарь тасок для студента
