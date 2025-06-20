@@ -4,6 +4,7 @@ services:
     container_name: redis
     command:
       - redis-server
+      - --requirepass ${PASSWORD_REDIS}
     volumes:
       - './docker_info/redis_data:/data'
     ports:
@@ -38,9 +39,9 @@ services:
     volumes:
       - ./docker_info/postgresql_data:/var/lib/postgresql/data
     environment:
-       POSTGRES_DB: TutorStudentBotDb
-       POSTGRES_USER: vladimir
-       POSTGRES_PASSWORD: amazingroom123!
+       POSTGRES_DB: ${DB_POSTGRES}
+       POSTGRES_USER: ${NAME_POSTGRES}
+       POSTGRES_PASSWORD: ${PASSWORD_POSTGRES}
     ports:
       - 5432:5432
     restart: always
