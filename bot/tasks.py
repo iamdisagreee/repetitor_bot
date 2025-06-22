@@ -115,11 +115,10 @@ async def activities_day_teacher(teacher_id: int,
 @worker.task(task_name='student_mailing_lessons')
 async def student_mailing_lessons(context: Context = TaskiqDepends(),
                                   bot: Bot = TaskiqDepends()):
-    await scheduler_storage.startup()
 
     scheduled_tasks = await give_dictionary_tasks_student()
-
-    # print(await scheduler_storage.get_schedules())
+    # print(scheduled_tasks)
+    print(await scheduler_storage.get_schedules())
 
     async with context.state.session_pool() as session:
         list_students_id = await give_lessons_for_day_students(session)
@@ -219,7 +218,6 @@ async def student_mailing_lessons(context: Context = TaskiqDepends(),
         await session.commit()
     # for x in await scheduler_storage.get_schedules():
     #     print(x.schedule_id)
-    await scheduler_storage.shutdown()
 
 
 # Уведомление о занятии за __переданное время__ до занятия для ученика
@@ -252,7 +250,6 @@ async def notice_lesson_certain_time_student(student_id: int,
 @worker.task(task_name='teacher_mailing_lessons')
 async def teacher_mailing_lessons(context: Context = TaskiqDepends(),
                                           bot: Bot = TaskiqDepends()):
-    await scheduler_storage.startup()
 
     #Словарь запланированных задач
     scheduled_tasks = await give_dictionary_tasks_teacher()
@@ -367,7 +364,6 @@ async def teacher_mailing_lessons(context: Context = TaskiqDepends(),
         await session.commit()
     # for x in await scheduler_storage.get_schedules():
         # print(x)
-    await scheduler_storage.shutdown()
 
 @worker.task(task_name='notice_lesson_certain_time_teacher')
 async def notice_lesson_certain_time_teacher(teacher_id: int,

@@ -7,7 +7,7 @@ from bot.config_data.config_data import load_config
 
 config_load = load_config()
 worker = PullBasedJetStreamBroker(
-    servers='localhost',
+    servers=config_load.nats.token,
     queue='taskiq_queue').with_result_backend(
     result_backend=NATSObjectStoreResultBackend(servers=config_load.nats.token)
 )
@@ -27,7 +27,14 @@ taskiq_aiogram.init(
 
 @worker.on_event(TaskiqEvents.WORKER_STARTUP)
 async def startup(state: TaskiqState) -> None:
+    # await worker.startup()
+    await scheduler_storage.startup()
     config = load_config()
     engine = create_async_engine(url=config.postgres.token,
                                  echo=False)
     state.session_pool = async_sessionmaker(engine)
+
+@worker.on_event(TaskiqEvents.WORKER_SHUTDOWN)
+async def shutdown(state: TaskiqState) -> None:
+    await scheduler_storage.shutdown()
+    # await worker.shutdown()

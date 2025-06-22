@@ -29,12 +29,6 @@ async def main():
     engine = create_async_engine(url=config.postgres.token,
                                  echo=False)
 
-    # async with engine.begin() as connection:
-    #      await connection.run_sync(Base.metadata.drop_all)
-    #      print("Удалил")
-    #      await connection.run_sync(Base.metadata.create_all)
-    #      print("Создал")
-
     # Создаем хранилище redis для FSM
     storage = RedisStorage.from_url(config.redis.token)
     # Устанавливаем вываливающуюся клавиатуру
@@ -66,7 +60,6 @@ async def main():
     )
     await worker.shutdown()
     await scheduler_storage.shutdown()
-
 
 if __name__ == '__main__':
     if platform.system() == 'Windows':

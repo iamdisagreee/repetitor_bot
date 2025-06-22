@@ -211,49 +211,7 @@ def create_all_records_week_day(weeks_day,
 
     return all_records_week_day_kb
 
-
 # Отображаем статусы занятий за день
-# async def show_status_lesson_day_kb(cur_buttons,
-#                                     session: AsyncSession,
-#                                     week_date_str: str):
-#     builder = InlineKeyboardBuilder()
-#     res_buttons = []
-#
-#     for button in cur_buttons:
-#         # Случай, когда кнопка пустая
-#         if button['student_id'] is None:
-#             continue
-#         student = await give_student_by_student_id(session, button['student_id'])
-#         price = student.price / 2 * len(button['list_status'])
-#         status = '✅' if len(button['list_status']) == sum(button['list_status']) else '❌'
-#         res_buttons.append(
-#             InlineKeyboardButton(
-#                 text=LEXICON_TEACHER['status_lesson_day_kb'].format(
-#                     status, student.name, button['lesson_on'].strftime("%H:%M"),
-#                     button['lesson_off'].strftime("%H:%M"), price),
-#                 callback_data=EditStatusPayCallbackFactory(
-#                     lesson_on=button['lesson_on'].strftime("%H:%M"),
-#                     lesson_off=button['lesson_off'].strftime("%H:%M"),
-#                     week_date=week_date_str,
-#                 ).pack()
-#             )
-#         )
-#     res_buttons.append(InlineKeyboardButton(text=LEXICON_TEACHER['back'],
-#                              callback_data=ShowNextSevenDaysCallbackFactory(
-#                                  week_date=week_date_str
-#                              ).pack()
-#                              )
-#                        )
-#     res_buttons.append(
-#                 InlineKeyboardButton(text=LEXICON_TEACHER['home'],
-#                              callback_data='auth_teacher')
-#     )
-#
-#     builder.row(*res_buttons[:-2], width=1)
-#     builder.row(*res_buttons[-2:], width=2)
-#
-#     return builder.as_markup()
-
 async def show_status_lesson_day_kb(buttons,
                                     session: AsyncSession,
                                     week_date_str: str):
@@ -293,54 +251,6 @@ async def show_status_lesson_day_kb(buttons,
 
     return builder.as_markup()
 
-#
-# def show_schedule_lesson_day_kb(cur_buttons,
-#                                 week_date_str: str):
-#     builder = InlineKeyboardBuilder()
-#     res_buttons = []
-#     for button in cur_buttons:
-#         if button['list_status'] != [-1]:
-#             status_bool = len(button['list_status']) == sum(button['list_status'])
-#             status = LEXICON_TEACHER['paid'] if status_bool \
-#                 else LEXICON_TEACHER['not_paid']
-#             # student = await give_student_by_student_id(session, button['student_id'])
-#             callback_data = ShowInfoDayCallbackFactory(
-#                 lesson_on=button['lesson_on'].strftime("%H:%M"),
-#                 lesson_off=button['lesson_off'].strftime("%H:%M"),
-#                 week_date=week_date_str,
-#                 status=status_bool,
-#                 price=button['price'] / 2 * len(button['list_status'])
-#             ).pack()
-#         else:
-#             status = LEXICON_TEACHER['not_reserved']
-#             callback_data = PlugScheduleLessonWeekDayBackFactory(
-#                 plug=button['lesson_on'].strftime("%H:%M")
-#             ).pack()
-#
-#         res_buttons.append(
-#             InlineKeyboardButton(
-#                 text=LEXICON_TEACHER['text_schedule_lesson_day'].format(
-#                     status, button['lesson_on'].strftime("%H:%M"),
-#                     button['lesson_off'].strftime("%H:%M")
-#                 ),
-#                 callback_data=callback_data
-#             )
-#         )
-#     res_buttons.append(
-#         InlineKeyboardButton(text=LEXICON_TEACHER['back'],
-#                              callback_data=ShowNextSevenDaysCallbackFactory(
-#                                  week_date=week_date_str
-#                              ).pack()
-#                              )
-#         )
-#     res_buttons.append(
-#         InlineKeyboardButton(text=LEXICON_TEACHER['home'],
-#                                  callback_data='auth_teacher'),
-#         )
-#
-#     builder.row(*res_buttons[:-2], width=1)
-#     builder.row(*res_buttons[-2:], width=2)
-#     return builder.as_markup()
 
 def show_schedule_lesson_day_kb(buttons,
                                 week_date_str: str):
